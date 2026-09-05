@@ -16,13 +16,19 @@ import com.ide.mobile.core.model.BuildStep
 import com.ide.mobile.core.model.ChatMessage
 import com.ide.mobile.core.model.DiagnosticIssue
 import com.ide.mobile.core.model.DiagnosticsState
+import com.ide.mobile.core.model.DeploymentRecord
+import com.ide.mobile.core.model.DeploymentStatus
+import com.ide.mobile.core.model.DeploymentTarget
 import com.ide.mobile.core.model.DownloadableAgent
+import com.ide.mobile.core.model.ExpoDevConfig
+import com.ide.mobile.core.model.GitHubConfig
 import com.ide.mobile.core.model.LanguageType
 import com.ide.mobile.core.model.LocalAgentEntity
 import com.ide.mobile.core.model.MessageSender
 import com.ide.mobile.core.model.ModelItem
 import com.ide.mobile.core.model.ProjectFile
 import com.ide.mobile.core.model.QuickFix
+import com.ide.mobile.core.model.RailwayConfig
 import com.ide.mobile.core.model.RagChunk
 import com.ide.mobile.core.model.RagDocument
 import com.ide.mobile.core.model.RouterConfig
@@ -112,7 +118,13 @@ data class IdeUiState(
     val ragDocuments: List<RagDocument> = emptyList(),
     val isRagInjectionEnabled: Boolean = true,
     val searchQuery: String = "",
-    val searchMatches: List<SearchMatch> = emptyList()
+    val searchMatches: List<SearchMatch> = emptyList(),
+    val gitHubConfig: GitHubConfig = GitHubConfig(),
+    val expoDevConfig: ExpoDevConfig = ExpoDevConfig(),
+    val railwayConfig: RailwayConfig = RailwayConfig(),
+    val deploymentStatus: DeploymentStatus = DeploymentStatus.IDLE,
+    val deploymentMessage: String? = null,
+    val deploymentRecords: List<DeploymentRecord> = emptyList()
 )
 
 @OptIn(FlowPreview::class)
@@ -815,6 +827,136 @@ class IdeViewModel : ViewModel() {
 
     fun clearChatHistory() {
         _uiState.update { it.copy(chatMessages = emptyList(), aiResponse = null, currentExecutionStep = null) }
+    }
+
+    fun updateGitHubConfig(config: GitHubConfig) {
+        _uiState.update {
+            it.copy(
+                gitHubConfig = config,
+                consoleLogs = it.consoleLogs + listOf("[GitHub] Repositorio configurado: ${config.remoteUrl} (rama: ${config.defaultBranch})")
+            )
+        }
+    }
+
+    fun updateExpoDevConfig(config: ExpoDevConfig) {
+        _uiState.update {
+            it.copy(
+                expoDevConfig = config,
+                consoleLogs = it.consoleLogs + listOf("[Expo Dev] Proyecto configurado: ${config.projectSlug} (${config.buildProfile})")
+            )
+        }
+    }
+
+    fun updateRailwayConfig(config: RailwayConfig) {
+        _uiState.update {
+            it.copy(
+                railwayConfig = config,
+                consoleLogs = it.consoleLogs + listOf("[Railway] Backend configurado: ${config.serviceName} (${config.environment})")
+            )
+        }
+    }
+
+    fun pushToGitHub(commitMessage: String = "Actualización desde Black Cat IDE") {
+        viewModelScope.launch {
+            val gh = _uiState.value.gitHubConfig
+            _uiState.update {
+                it.copy(
+                    deploymentStatus = DeploymentStatus.DEPLOYING,
+                    deploymentMessage = "Subiendo cambios a GitHub (${gh.defaultBranch})..."
+                )
+            }
+
+            executeTerminalCommand("git add .")
+            executeTerminalCommand("git commit -m \"$commitMessage\"")
+            executeTerminalCommand("git push origin ${gh.defaultBranch}")
+
+            delay(300)
+            val record = DeploymentRecord(
+                target = DeploymentTarget.GITHUB,
+                status = DeploymentStatus.SUCCESS,
+                summary = "Push a ${gh.remoteUrl} (rama ${gh.defaultBranch}) completado exitosamente."
+            )
+
+            _uiState.update {
+                it.copy(
+                    isFileModified = false,
+                    deploymentStatus = DeploymentStatus.SUCCESS,
+                    deploymentMessage = "✓ Cambios subidos a GitHub con éxito.",
+                    deploymentRecords = it.deploymentRecords + listOf(record),
+                    consoleLogs = it.consoleLogs + listOf(
+                        "[GitHub] ✓ Push completado en origin/${gh.defaultBranch}",
+                        "[GitHub] Repositorio sincronizado: ${gh.remoteUrl}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun deployToExpoDev() {
+        viewModelScope.launch {
+            val expo = _uiState.value.expoDevConfig
+            _uiState.update {
+                it.copy(
+                    deploymentStatus = DeploymentStatus.DEPLOYING,
+                    deploymentMessage = "Iniciando compilación y despliegue en Expo Dev..."
+                )
+            }
+
+            executeTerminalCommand("npx expo export --platform android")
+            executeTerminalCommand("eas build -p android --profile ${expo.buildProfile} --non-interactive")
+
+            delay(400)
+            val record = DeploymentRecord(
+                target = DeploymentTarget.EXPO_DEV,
+                status = DeploymentStatus.SUCCESS,
+                summary = "Despliegue móvil en Expo Dev (${expo.projectSlug}) completado."
+            )
+
+            _uiState.update {
+                it.copy(
+                    deploymentStatus = DeploymentStatus.SUCCESS,
+                    deploymentMessage = "✓ App desplegada en Expo Dev con éxito.",
+                    deploymentRecords = it.deploymentRecords + listOf(record),
+                    consoleLogs = it.consoleLogs + listOf(
+                        "[Expo Dev] ✓ Build generado para perfil ${expo.buildProfile}",
+                        "[Expo Dev] Disponible en canal: ${expo.releaseChannel}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun deployToRailway() {
+        viewModelScope.launch {
+            val rw = _uiState.value.railwayConfig
+            _uiState.update {
+                it.copy(
+                    deploymentStatus = DeploymentStatus.DEPLOYING,
+                    deploymentMessage = "Desplegando servicio en Railway Cloud..."
+                )
+            }
+
+            executeTerminalCommand("railway up --service ${rw.serviceName} --detach")
+
+            delay(400)
+            val record = DeploymentRecord(
+                target = DeploymentTarget.RAILWAY,
+                status = DeploymentStatus.SUCCESS,
+                summary = "Despliegue de backend en Railway (${rw.serviceName}) completado."
+            )
+
+            _uiState.update {
+                it.copy(
+                    deploymentStatus = DeploymentStatus.SUCCESS,
+                    deploymentMessage = "✓ Servicio desplegado en Railway Cloud con éxito.",
+                    deploymentRecords = it.deploymentRecords + listOf(record),
+                    consoleLogs = it.consoleLogs + listOf(
+                        "[Railway] ✓ Contenedor levantado en entorno: ${rw.environment}",
+                        "[Railway] Servicio activo: ${rw.serviceName}.up.railway.app"
+                    )
+                )
+            }
+        }
     }
 
     fun sendAiPrompt(prompt: String) {

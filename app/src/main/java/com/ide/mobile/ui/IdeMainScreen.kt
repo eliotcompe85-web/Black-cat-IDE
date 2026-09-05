@@ -246,11 +246,27 @@ fun IdeMainScreen(
                     }
                     MainNavTab.GIT -> {
                         GitScreen(
+                            isFileModified = uiState.isFileModified,
+                            activeFileName = uiState.activeFile.path,
+                            gitHubConfig = uiState.gitHubConfig,
+                            expoDevConfig = uiState.expoDevConfig,
+                            railwayConfig = uiState.railwayConfig,
+                            deploymentStatus = uiState.deploymentStatus,
+                            deploymentMessage = uiState.deploymentMessage,
                             onCommit = { msg ->
                                 viewModel.commitChanges(msg)
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("Cambios confirmados: $msg")
                                 }
+                            },
+                            onPushToGitHub = { msg ->
+                                viewModel.pushToGitHub(msg)
+                            },
+                            onDeployExpoDev = {
+                                viewModel.deployToExpoDev()
+                            },
+                            onDeployRailway = {
+                                viewModel.deployToRailway()
                             },
                             onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
@@ -290,15 +306,29 @@ fun IdeMainScreen(
                     MainNavTab.SETTINGS -> {
                         SettingsScreen(
                             apiKeysConfig = uiState.apiKeysConfig,
+                            gitHubConfig = uiState.gitHubConfig,
+                            expoDevConfig = uiState.expoDevConfig,
+                            railwayConfig = uiState.railwayConfig,
                             localHost = uiState.localAiHost,
                             localPort = uiState.localAiPort,
-                            localDashboardPort = uiState.localAiDashboardPort,
                             selectedModel = uiState.selectedLocalModel,
                             testStatus = uiState.localAiTestStatus,
                             availableAgents = uiState.availableAgents,
                             onSaveApiKeys = { cfg ->
                                 viewModel.updateApiKeys(cfg)
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Claves de API guardadas") }
+                            },
+                            onSaveGitHubConfig = { cfg ->
+                                viewModel.updateGitHubConfig(cfg)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración GitHub guardada") }
+                            },
+                            onSaveExpoDevConfig = { cfg ->
+                                viewModel.updateExpoDevConfig(cfg)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración Expo Dev guardada") }
+                            },
+                            onSaveRailwayConfig = { cfg ->
+                                viewModel.updateRailwayConfig(cfg)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración Railway guardada") }
                             },
                             onSaveLocalConfig = { host, port, model ->
                                 viewModel.updateLocalAiConfig(host, port, model)

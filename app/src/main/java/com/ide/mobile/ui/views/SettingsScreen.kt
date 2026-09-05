@@ -22,20 +22,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.ide.mobile.core.model.ApiKeysConfig
+import com.ide.mobile.core.model.ExpoDevConfig
+import com.ide.mobile.core.model.GitHubConfig
 import com.ide.mobile.core.model.LocalAgentEntity
+import com.ide.mobile.core.model.RailwayConfig
 import com.ide.mobile.ui.components.BlackCatHeroCard
 import com.ide.mobile.ui.components.BlackCatWatermarkBadge
 
 @Composable
 fun SettingsScreen(
     apiKeysConfig: ApiKeysConfig = ApiKeysConfig(),
+    gitHubConfig: GitHubConfig = GitHubConfig(),
+    expoDevConfig: ExpoDevConfig = ExpoDevConfig(),
+    railwayConfig: RailwayConfig = RailwayConfig(),
     localHost: String = "127.0.0.1",
     localPort: Int = 11434,
-    localDashboardPort: Int = 8080,
     selectedModel: String = "Qwen3.5-2B-Q4_0.gguf",
     testStatus: String? = null,
     availableAgents: List<LocalAgentEntity> = emptyList(),
     onSaveApiKeys: (ApiKeysConfig) -> Unit = {},
+    onSaveGitHubConfig: (GitHubConfig) -> Unit = {},
+    onSaveExpoDevConfig: (ExpoDevConfig) -> Unit = {},
+    onSaveRailwayConfig: (RailwayConfig) -> Unit = {},
     onSaveLocalConfig: (String, Int, String) -> Unit = { _, _, _ -> },
     onTestConnection: (String, Int) -> Unit = { _, _ -> },
     onImportAgentClick: () -> Unit = {},
@@ -51,6 +59,21 @@ fun SettingsScreen(
     var claudeModel by remember { mutableStateOf(apiKeysConfig.claudeModel) }
     var perplexityKey by remember { mutableStateOf(apiKeysConfig.perplexityApiKey) }
     var perplexityModel by remember { mutableStateOf(apiKeysConfig.perplexityModel) }
+
+    var ghRemoteUrl by remember { mutableStateOf(gitHubConfig.remoteUrl) }
+    var ghToken by remember { mutableStateOf(gitHubConfig.personalAccessToken) }
+    var ghBranch by remember { mutableStateOf(gitHubConfig.defaultBranch) }
+    var ghAuthorName by remember { mutableStateOf(gitHubConfig.authorName) }
+    var ghAuthorEmail by remember { mutableStateOf(gitHubConfig.authorEmail) }
+
+    var expoToken by remember { mutableStateOf(expoDevConfig.expoToken) }
+    var expoSlug by remember { mutableStateOf(expoDevConfig.projectSlug) }
+    var expoProfile by remember { mutableStateOf(expoDevConfig.buildProfile) }
+
+    var rwToken by remember { mutableStateOf(railwayConfig.railwayToken) }
+    var rwProjectId by remember { mutableStateOf(railwayConfig.projectId) }
+    var rwService by remember { mutableStateOf(railwayConfig.serviceName) }
+    var rwEnv by remember { mutableStateOf(railwayConfig.environment) }
 
     var hostInput by remember { mutableStateOf(localHost) }
     var portInput by remember { mutableStateOf(localPort.toString()) }
@@ -370,6 +393,194 @@ fun SettingsScreen(
 
                 if (testStatus != null) {
                     Text(testStatus, color = Color(0xFF38BDF8), fontSize = 11.sp)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ==========================================
+        // 3. CONFIGURACIÓN DE GITHUB
+        // ==========================================
+        Text(
+            text = "GITHUB (REPOSITORIO & CREDENCIALES)",
+            color = Color(0xFF94A3B8),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Surface(
+            color = Color(0xFF141522),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF26283C)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🐱", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("GitHub Git Remote", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                SettingsInputField(
+                    label = "URL del Repositorio Remoto",
+                    value = ghRemoteUrl,
+                    onValueChange = { ghRemoteUrl = it },
+                    placeholder = "https://github.com/usuario/repositorio.git"
+                )
+                SettingsInputField(
+                    label = "Personal Access Token (PAT)",
+                    value = ghToken,
+                    onValueChange = { ghToken = it },
+                    placeholder = "ghp_xxxxxxxxxxxx"
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Rama por Defecto", value = ghBranch, onValueChange = { ghBranch = it }, placeholder = "main")
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Nombre de Autor", value = ghAuthorName, onValueChange = { ghAuthorName = it }, placeholder = "Tu Nombre")
+                    }
+                }
+                Button(
+                    onClick = {
+                        onSaveGitHubConfig(
+                            gitHubConfig.copy(
+                                remoteUrl = ghRemoteUrl,
+                                personalAccessToken = ghToken,
+                                defaultBranch = ghBranch,
+                                authorName = ghAuthorName,
+                                authorEmail = ghAuthorEmail
+                            )
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34D399)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(34.dp)
+                ) {
+                    Text("Guardar Configuración GitHub", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ==========================================
+        // 4. CONFIGURACIÓN DE EXPO DEV
+        // ==========================================
+        Text(
+            text = "EXPO DEV (DESPLIEGUE MÓVIL REACT NATIVE)",
+            color = Color(0xFF94A3B8),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Surface(
+            color = Color(0xFF141522),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF26283C)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🚀", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Expo & EAS Build", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                SettingsInputField(
+                    label = "Expo Access Token (EXPO_TOKEN)",
+                    value = expoToken,
+                    onValueChange = { expoToken = it },
+                    placeholder = "expo-token-..."
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Project Slug", value = expoSlug, onValueChange = { expoSlug = it }, placeholder = "mi-app-movil")
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Perfil de Build", value = expoProfile, onValueChange = { expoProfile = it }, placeholder = "android-apk")
+                    }
+                }
+                Button(
+                    onClick = {
+                        onSaveExpoDevConfig(
+                            expoDevConfig.copy(
+                                expoToken = expoToken,
+                                projectSlug = expoSlug,
+                                buildProfile = expoProfile,
+                                isConfigured = expoToken.isNotBlank()
+                            )
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF38BDF8)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(34.dp)
+                ) {
+                    Text("Guardar Configuración Expo Dev", color = Color.Black, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(20.dp))
+
+        // ==========================================
+        // 5. CONFIGURACIÓN DE RAILWAY
+        // ==========================================
+        Text(
+            text = "RAILWAY CLOUD (BACKEND & DATABASES)",
+            color = Color(0xFF94A3B8),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            letterSpacing = 1.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Surface(
+            color = Color(0xFF141522),
+            shape = RoundedCornerShape(12.dp),
+            border = BorderStroke(1.dp, Color(0xFF26283C)),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🚂", fontSize = 16.sp)
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text("Railway Cloud Engine", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                }
+                SettingsInputField(
+                    label = "Railway API Token",
+                    value = rwToken,
+                    onValueChange = { rwToken = it },
+                    placeholder = "railway_token_..."
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Nombre del Servicio", value = rwService, onValueChange = { rwService = it }, placeholder = "api-service")
+                    }
+                    Box(modifier = Modifier.weight(1f)) {
+                        SettingsInputField(label = "Entorno", value = rwEnv, onValueChange = { rwEnv = it }, placeholder = "production")
+                    }
+                }
+                Button(
+                    onClick = {
+                        onSaveRailwayConfig(
+                            railwayConfig.copy(
+                                railwayToken = rwToken,
+                                projectId = rwProjectId,
+                                serviceName = rwService,
+                                environment = rwEnv,
+                                isConfigured = rwToken.isNotBlank()
+                            )
+                        )
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF)),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(34.dp)
+                ) {
+                    Text("Guardar Configuración Railway", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                 }
             }
         }
