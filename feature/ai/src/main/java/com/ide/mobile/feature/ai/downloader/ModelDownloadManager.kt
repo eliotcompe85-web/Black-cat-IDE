@@ -6,6 +6,7 @@ import com.ide.mobile.core.model.ModelStatus
 import com.ide.mobile.core.model.ModelType
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -14,11 +15,13 @@ import kotlinx.coroutines.launch
 
 /**
  * Model Management & Asynchronous Downloader for Black Cat IDE.
- * Supports Hugging Face GGUF models and Google LiteRT-LM models.
+ * Fully interactive with real-time download simulation, pause, resume, and lifecycle management.
  */
 class ModelDownloadManager(
     private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) {
+
+    private val activeJobs = mutableMapOf<String, Job>()
 
     // Models installed or registered in device storage
     private val _installedModels = MutableStateFlow<List<ModelItem>>(
@@ -87,6 +90,20 @@ class ModelDownloadManager(
                 memoryRequiredMb = 820
             ),
             ModelItem(
+                id = "qwen-coder-1.5b",
+                name = "Qwen2.5-Coder-1.5B-Q4_0.gguf",
+                sizeBytes = 950000000L,
+                sizeDisplay = "905 MB",
+                format = ModelFormat.LLAMA_CPP_GGUF,
+                type = ModelType.CODE,
+                status = ModelStatus.READY,
+                path = "https://huggingface.co/Qwen/Qwen2.5-Coder-1.5B-GGUF",
+                quantization = "Q4_0",
+                parameterCount = "1.5B",
+                description = "Alibaba Qwen especializado en generación y depuración de código.",
+                memoryRequiredMb = 920
+            ),
+            ModelItem(
                 id = "phi-3.5-mini",
                 name = "Phi-3.5-mini-instruct-4k.litertlm",
                 sizeBytes = 1950000000L,
@@ -123,7 +140,6 @@ class ModelDownloadManager(
             if (item.id == modelId) {
                 item.copy(status = ModelStatus.RUNNING)
             } else if (item.status == ModelStatus.RUNNING) {
-                // Stop other running model if active
                 item.copy(status = ModelStatus.READY)
             } else {
                 item
@@ -138,6 +154,8 @@ class ModelDownloadManager(
     }
 
     fun deleteModel(modelId: String) {
+        activeJobs[modelId]?.cancel()
+        activeJobs.remove(modelId)
         _installedModels.value = _installedModels.value.filter { it.id != modelId }
     }
 
@@ -168,39 +186,67 @@ class ModelDownloadManager(
     }
 
     fun startDownload(catalogItem: ModelItem) {
-        // Check if already in installed
-        val exists = _installedModels.value.any { it.name == catalogItem.name }
-        if (exists) return
+        // Prevent duplicate downloads
+        val existingInstalled = _installedModels.value.firstOrNull { it.id == catalogItem.id || it.name == catalogItem.name }
+        if (existingInstalled != null && existingInstalled.status == ModelStatus.DOWNLOADING) {
+            return
+        }
 
         val downloadingItem = catalogItem.copy(
+            id = catalogItem.id,
             status = ModelStatus.DOWNLOADING,
             downloadProgress = 0.05f,
-            downloadSpeed = "12.4 MB/s"
+            downloadSpeed = "14.2 MB/s"
         )
-        _installedModels.value = listOf(downloadingItem) + _installedModels.value
 
-        // Simulate asynchronous download progress
-        scope.launch {
-            for (step in 1..10) {
-                delay(400)
-                val currentProgress = (step * 0.1f).coerceAtMost(1.0f)
-                val speed = "${(10 + (step % 5) * 1.5).toInt()}.${step % 9} MB/s"
+        // Add or update in installed models list
+        val currentList = _installedModels.value.filter { it.id != catalogItem.id && it.name != catalogItem.name }
+        _installedModels.value = listOf(downloadingItem) + currentList
 
-                _installedModels.value = _installedModels.value.map {
-                    if (it.id == catalogItem.id) {
-                        if (step == 10) {
+        // Update catalog status indicator
+        _hubCatalog.value = _hubCatalog.value.map {
+            if (it.id == catalogItem.id) it.copy(status = ModelStatus.DOWNLOADING, downloadProgress = 0.05f) else it
+        }
+
+        // Cancel any previous job for this model
+        activeJobs[catalogItem.id]?.cancel()
+
+        // Launch simulated streaming download
+        val job = scope.launch {
+            try {
+                for (step in 1..10) {
+                    delay(350)
+                    val currentProgress = (step * 0.1f).coerceAtMost(1.0f)
+                    val speed = "${(12 + (step % 4) * 2.1).toInt()}.${step % 9} MB/s"
+
+                    _installedModels.value = _installedModels.value.map {
+                        if (it.id == catalogItem.id) {
+                            if (step == 10) {
+                                it.copy(
+                                    status = ModelStatus.READY,
+                                    downloadProgress = 1.0f,
+                                    downloadSpeed = "",
+                                    path = "/data/user/0/com.ide.mobile/files/models/${catalogItem.name}"
+                                )
+                            } else {
+                                it.copy(downloadProgress = currentProgress, downloadSpeed = speed)
+                            }
+                        } else it
+                    }
+
+                    _hubCatalog.value = _hubCatalog.value.map {
+                        if (it.id == catalogItem.id) {
                             it.copy(
-                                status = ModelStatus.READY,
-                                downloadProgress = 1.0f,
-                                downloadSpeed = "",
-                                path = "/data/user/0/com.ide.mobile/files/models/${catalogItem.name}"
+                                status = if (step == 10) ModelStatus.READY else ModelStatus.DOWNLOADING,
+                                downloadProgress = currentProgress
                             )
-                        } else {
-                            it.copy(downloadProgress = currentProgress, downloadSpeed = speed)
-                        }
-                    } else it
+                        } else it
+                    }
                 }
+            } finally {
+                activeJobs.remove(catalogItem.id)
             }
         }
+        activeJobs[catalogItem.id] = job
     }
 }

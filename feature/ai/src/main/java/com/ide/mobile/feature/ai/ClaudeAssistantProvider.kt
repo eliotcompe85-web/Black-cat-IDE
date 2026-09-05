@@ -1,0 +1,111 @@
+package com.ide.mobile.feature.ai
+
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.withContext
+import org.json.JSONArray
+import org.json.JSONObject
+import java.io.BufferedReader
+import java.io.InputStreamReader
+import java.io.OutputStreamWriter
+import java.net.HttpURLConnection
+import java.net.URL
+
+/**
+ * Proveedor para Anthropic Claude (Claude 3.5 Sonnet, Claude 3.5 Haiku).
+ */
+class ClaudeAssistantProvider(
+    private val apiKey: String = "",
+    val modelName: String = "claude-3-5-sonnet-20241022"
+) : CodeAssistantProvider {
+
+    override val providerType: ProviderType = ProviderType.CLAUDE_API
+
+    override suspend fun isAvailable(): Boolean {
+        return apiKey.isNotBlank() && apiKey.startsWith("sk-ant-")
+    }
+
+    override fun generateCompletionStream(
+        prompt: String,
+        context: CodeContext,
+        config: GenerationConfig
+    ): Flow<String> = flow {
+        val userPrompt = buildString {
+            append("Actúa como el asistente de desarrollo móvil Antigravity de Black Cat IDE.\n")
+            append("Archivo: ${context.filePath} (Línea ${context.currentLine})\n\n")
+            if (context.fullText.isNotBlank()) {
+                append("```dart/kotlin\n")
+                append(context.fullText.take(2500))
+                append("\n```\n\n")
+            }
+            append("Instrucción: $prompt\n")
+        }
+
+        if (apiKey.isBlank()) {
+            emit("⚠️ [Anthropic Claude]: No has configurado tu clave sk-ant-...\nIngresa en Ajustes ⚙️ > Proveedores de IA para activarlo.")
+            return@flow
+        }
+
+        val result = try {
+            fetchClaudeContent(userPrompt)
+        } catch (e: Exception) {
+            null
+        }
+
+        if (result != null && result.isNotBlank()) {
+            val words = result.split(" ")
+            for (i in words.indices) {
+                emit(words[i] + if (i < words.size - 1) " " else "")
+                delay(20)
+            }
+        } else {
+            emit("⚠️ Error de conexión con Anthropic Claude. Revisa tu clave y conectividad.")
+        }
+    }
+
+    private suspend fun fetchClaudeContent(promptText: String): String = withContext(Dispatchers.IO) {
+        val url = URL("https://api.anthropic.com/v1/messages")
+        val conn = (url.openConnection() as HttpURLConnection).apply {
+            requestMethod = "POST"
+            setRequestProperty("Content-Type", "application/json")
+            setRequestProperty("x-api-key", apiKey)
+            setRequestProperty("anthropic-version", "2023-06-01")
+            connectTimeout = 12000
+            readTimeout = 20000
+            doOutput = true
+        }
+
+        val root = JSONObject().apply {
+            put("model", modelName)
+            put("max_tokens", 1024)
+            put("messages", JSONArray().apply {
+                put(JSONObject().apply {
+                    put("role", "user")
+                    put("content", promptText)
+                })
+            })
+        }
+
+        OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
+            writer.write(root.toString())
+            writer.flush()
+        }
+
+        val responseCode = conn.responseCode
+        if (responseCode == HttpURLConnection.HTTP_OK) {
+            val response = BufferedReader(InputStreamReader(conn.inputStream, "UTF-8")).use { it.readText() }
+            val json = JSONObject(response)
+            val contentArray = json.getJSONArray("content")
+            if (contentArray.length() > 0) {
+                return@withContext contentArray.getJSONObject(0).getString("text")
+            }
+        }
+        ""
+    }
+
+    override suspend fun suggestQuickFix(errorMessage: String, faultyCode: String): String {
+        return "// [Claude QuickFix]\n$faultyCode // Solución a: $errorMessage"
+    }
+}

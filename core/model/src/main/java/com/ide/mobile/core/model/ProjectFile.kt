@@ -192,4 +192,55 @@ data class ProjectFile(
             return root
         }
     }
+
+    fun flatten(): List<ProjectFile> {
+        val result = mutableListOf(this)
+        for (child in children) {
+            result.addAll(child.flatten())
+        }
+        return result
+    }
+
+    fun findFileById(searchId: String): ProjectFile? {
+        if (this.id == searchId) return this
+        for (child in children) {
+            val found = child.findFileById(searchId)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    fun findFileByPath(searchPath: String): ProjectFile? {
+        if (this.path == searchPath) return this
+        for (child in children) {
+            val found = child.findFileByPath(searchPath)
+            if (found != null) return found
+        }
+        return null
+    }
+
+    fun addNode(targetParentId: String, newNode: ProjectFile): Boolean {
+        if (this.id == targetParentId && this.isDirectory) {
+            children.add(newNode)
+            return true
+        }
+        for (child in children) {
+            if (child.addNode(targetParentId, newNode)) return true
+        }
+        return false
+    }
+
+    fun removeNode(targetId: String): Boolean {
+        val iterator = children.iterator()
+        while (iterator.hasNext()) {
+            val item = iterator.next()
+            if (item.id == targetId) {
+                iterator.remove()
+                return true
+            }
+            if (item.removeNode(targetId)) return true
+        }
+        return false
+    }
 }
+

@@ -76,9 +76,10 @@ fun MobileCodeKeyboardBar(
         horizontalArrangement = Arrangement.spacedBy(3.dp)
     ) {
         // Contextual Quick Fix Assistant Button (displayed when cursor is on an error)
-        if (focusedIssue?.quickFix != null) {
+        val fix = focusedIssue?.quickFix
+        if (fix != null) {
             TextButton(
-                onClick = { onApplyQuickFix(focusedIssue.quickFix) },
+                onClick = { onApplyQuickFix(fix) },
                 colors = ButtonDefaults.textButtonColors(
                     containerColor = Color(0xFF3574F0),
                     contentColor = Color.White
@@ -94,7 +95,7 @@ fun MobileCodeKeyboardBar(
                 )
                 Spacer(modifier = Modifier.width(4.dp))
                 Text(
-                    text = focusedIssue.quickFix.title,
+                    text = fix.title,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1

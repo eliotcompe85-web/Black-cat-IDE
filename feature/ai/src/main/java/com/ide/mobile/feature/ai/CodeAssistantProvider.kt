@@ -3,11 +3,15 @@ package com.ide.mobile.feature.ai
 import kotlinx.coroutines.flow.Flow
 
 enum class ProviderType(val displayName: String, val badge: String) {
-    LOCAL_GGUF("Local GGUF (On-Device)", "📱 NPU/CPU"),
-    GEMINI_API("Google Gemini API", "⚡ Ultra Rápido"),
-    OPENAI_API("OpenAI GPT", "☁️ Cloud"),
-    CLAUDE_API("Anthropic Claude", "🧠 Cloud")
+    LOCAL_AGENT("Agente Local Antigravity", "🤖 Local"),
+    GEMINI_API("Google Gemini AI", "⚡ Ultra Rápido"),
+    OPENAI_API("OpenAI ChatGPT", "🧠 Cloud"),
+    CLAUDE_API("Anthropic Claude", "🎭 Cloud"),
+    PERPLEXITY_API("Perplexity AI", "🔍 Web / Docs"),
+    LOCAL_GGUF("Local LM (llama.cpp)", "📱 On-Device"),
+    LITERT_LM("Google LiteRT-LM", "⚡ NPU/GPU")
 }
+
 
 data class GenerationConfig(
     val temperature: Float = 0.2f,

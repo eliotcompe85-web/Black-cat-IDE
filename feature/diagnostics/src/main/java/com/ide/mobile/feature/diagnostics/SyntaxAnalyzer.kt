@@ -26,7 +26,7 @@ object SyntaxAnalyzer {
         return when (language) {
             LanguageType.KOTLIN -> analyzeKotlin(code)
             LanguageType.XML -> analyzeXml(code)
-            LanguageType.OTHER -> emptyList()
+            else -> emptyList()
         }
     }
 

@@ -138,8 +138,8 @@ fun LiveComposePreviewHost(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.Center
+                verticalArrangement = Arrangement.Center,
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 // Simulated App UI rendered dynamically
                 Box(

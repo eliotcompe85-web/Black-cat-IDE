@@ -130,4 +130,44 @@ class BlackCatSystemE2ETest {
         assertTrue("Tokens/sec must be positive", metrics.tokensPerSecond > 0f)
         assertTrue("Temperature should be in realistic phone range", metrics.temperatureCelsius in 20f..85f)
     }
+
+    @Test
+    fun testLocalAgentEngine_BuiltInAndImport() = runBlocking {
+        val engine = LocalAgentEngine()
+        val builtIns = engine.getAllAgents()
+        assertTrue("Must have built-in agents", builtIns.size >= 3)
+        assertTrue(builtIns.any { it.name.contains("Black Cat Copilot") })
+        assertTrue(builtIns.any { it.name.contains("Architect") })
+        assertTrue(builtIns.any { it.name.contains("QuickFixer") })
+
+        // Test JSON agent import
+        val jsonContent = """
+            {
+              "name": "Custom Mobile Agent",
+              "description": "Agente personalizado de prueba",
+              "systemPrompt": "Eres un asistente de pruebas.",
+              "icon": "🧪",
+              "skills": ["unit-test", "kotlin-mock"]
+            }
+        """.trimIndent()
+        val imported = engine.importAgentFromContent(jsonContent, "custom.json")
+        assertEquals("Custom Mobile Agent", imported.name)
+        assertEquals("🧪", imported.icon)
+        assertTrue(imported.skills.contains("unit-test"))
+
+        // Test running agent
+        val context = CodeContext(
+            fullText = "class TestWidget extends StatelessWidget {}",
+            cursorOffset = 0,
+            currentLine = 1,
+            filePath = "/lib/main.dart"
+        )
+        val flow = engine.runAgent(imported, "generar widget", context)
+        val chunks = mutableListOf<String>()
+        flow.collect { chunks.add(it) }
+        val output = chunks.joinToString("")
+        assertTrue(output.contains("Custom Mobile Agent"))
+        assertTrue(output.contains("Código Generado"))
+    }
 }
+

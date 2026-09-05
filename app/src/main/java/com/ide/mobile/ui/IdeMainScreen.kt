@@ -1,72 +1,20 @@
 package com.ide.mobile.ui
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AccountTree
-import androidx.compose.material.icons.filled.AutoFixHigh
-import androidx.compose.material.icons.filled.Check
-import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Code
-import androidx.compose.material.icons.filled.ContentCopy
-import androidx.compose.material.icons.filled.Folder
-import androidx.compose.material.icons.filled.Menu
-import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VerticalSplit
-import androidx.compose.material.icons.filled.Warning
-import com.ide.mobile.feature.compiler.LiveComposePreviewHost
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.rememberDrawerState
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -75,17 +23,20 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ide.mobile.core.model.ProjectFile
 import com.ide.mobile.feature.ai.ui.AiAssistantPanel
+import com.ide.mobile.feature.compiler.LiveComposePreviewHost
 import com.ide.mobile.feature.editor.CodeEditorCore
 import com.ide.mobile.feature.explorer.ProjectExplorerDrawer
 import com.ide.mobile.feature.keyboard.MobileCodeKeyboardBar
+import com.ide.mobile.ui.components.BlackCatEditorWatermark
+import com.ide.mobile.ui.components.BlackCatLogo
 import com.ide.mobile.ui.views.FilesScreen
 import com.ide.mobile.ui.views.GitScreen
 import com.ide.mobile.ui.views.SearchScreen
 import com.ide.mobile.ui.views.SettingsScreen
 import com.ide.mobile.ui.views.TerminalScreen
+import com.ide.mobile.ui.views.aihub.AiPluginsScreen
 import com.ide.mobile.ui.views.aihub.ModelManagementScreen
 import com.ide.mobile.ui.views.aihub.RuntimeEngineScreen
-import com.ide.mobile.ui.views.aihub.AiPluginsScreen
 import com.ide.mobile.ui.views.aihub.SiloLibraryScreen
 import com.ide.mobile.viewmodel.AiHubSubPage
 import com.ide.mobile.viewmodel.IdeViewModel
@@ -101,7 +52,16 @@ fun IdeMainScreen(
     val coroutineScope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
     val snackbarHostState = remember { SnackbarHostState() }
+
     var showMenuOptions by remember { mutableStateOf(false) }
+    var showNewFileDialog by remember { mutableStateOf(false) }
+    var showNewFolderDialog by remember { mutableStateOf(false) }
+    var showImportAgentDialog by remember { mutableStateOf(false) }
+
+    var newFileNameInput by remember { mutableStateOf("") }
+    var newFolderNameInput by remember { mutableStateOf("") }
+    var importAgentContentInput by remember { mutableStateOf("") }
+    var importAgentNameInput by remember { mutableStateOf("") }
 
     ModalNavigationDrawer(
         drawerState = drawerState,
@@ -114,10 +74,24 @@ fun IdeMainScreen(
                     viewModel.selectNavTab(MainNavTab.EDITOR)
                     coroutineScope.launch { drawerState.close() }
                 },
-                onNewFileClick = {
-                    coroutineScope.launch {
-                        snackbarHostState.showSnackbar("Nuevo archivo creado en lib/")
+                onNavigatePage = { pageKey ->
+                    when (pageKey) {
+                        "EDITOR" -> viewModel.selectNavTab(MainNavTab.EDITOR)
+                        "FILES" -> viewModel.selectNavTab(MainNavTab.FILES)
+                        "AI_ASSISTANT" -> viewModel.selectNavTab(MainNavTab.AI_ASSISTANT)
+                        "TERMINAL" -> viewModel.selectNavTab(MainNavTab.TERMINAL)
+                        "SEARCH" -> viewModel.selectNavTab(MainNavTab.SEARCH)
+                        "GIT" -> viewModel.selectNavTab(MainNavTab.GIT)
+                        "MODELS" -> viewModel.selectNavTab(MainNavTab.MODELS)
+                        "TELEMETRY" -> viewModel.selectNavTab(MainNavTab.TELEMETRY)
+                        "DOCS_RAG" -> viewModel.selectNavTab(MainNavTab.DOCS_RAG)
+                        "SETTINGS" -> viewModel.selectNavTab(MainNavTab.SETTINGS)
                     }
+                    coroutineScope.launch { drawerState.close() }
+                },
+                onNewFileClick = {
+                    showNewFileDialog = true
+                    coroutineScope.launch { drawerState.close() }
                 }
             )
         }
@@ -126,27 +100,54 @@ fun IdeMainScreen(
             snackbarHost = { SnackbarHost(snackbarHostState) },
             containerColor = Color(0xFF0C0D15),
             topBar = {
-                IdeTopAppBar(
-                    activeFile = uiState.activeFile,
-                    onMenuClick = { coroutineScope.launch { drawerState.open() } },
-                    onRunClick = { viewModel.runProject() },
-                    onAiSparkleClick = { viewModel.toggleAiPanel() },
-                    onMoreClick = { showMenuOptions = true },
-                    showMenuOptions = showMenuOptions,
-                    onDismissMenu = { showMenuOptions = false },
-                    onOpenTerminal = {
-                        viewModel.toggleTerminal()
-                        showMenuOptions = false
-                    },
-                    onLivePreview = {
-                        viewModel.toggleLivePreview()
-                        showMenuOptions = false
-                    },
-                    onOpenAiSubPage = { page ->
-                        viewModel.openAiSubPage(page)
-                        showMenuOptions = false
-                    }
-                )
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    IdeTopAppBar(
+                        activeFile = uiState.activeFile,
+                        currentTab = uiState.currentNavTab,
+                        isFileModified = uiState.isFileModified,
+                        onMenuClick = { coroutineScope.launch { drawerState.open() } },
+                        onRunClick = { viewModel.runProject() },
+                        onAiSparkleClick = { viewModel.selectNavTab(MainNavTab.AI_ASSISTANT) },
+                        onMoreClick = { showMenuOptions = true },
+                        showMenuOptions = showMenuOptions,
+                        onDismissMenu = { showMenuOptions = false },
+                        onSaveFile = {
+                            val saved = viewModel.saveCurrentFile()
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Guardado: $saved") }
+                            showMenuOptions = false
+                        },
+                        onNewFile = {
+                            showNewFileDialog = true
+                            showMenuOptions = false
+                        },
+                        onNewFolder = {
+                            showNewFolderDialog = true
+                            showMenuOptions = false
+                        },
+                        onCloseTab = {
+                            viewModel.closeTab(uiState.activeFile)
+                            showMenuOptions = false
+                        },
+                        onOpenTerminal = {
+                            viewModel.selectNavTab(MainNavTab.TERMINAL)
+                            showMenuOptions = false
+                        },
+                        onLivePreview = {
+                            viewModel.toggleLivePreview()
+                            showMenuOptions = false
+                        },
+                        onOpenAiSubPage = { page ->
+                            viewModel.openAiSubPage(page)
+                            showMenuOptions = false
+                        }
+                    )
+
+                    // Barra horizontal de categorías para cambiar entre todas las páginas sin salir de la app
+                    IdeCategoryNavBar(
+                        selectedTab = uiState.currentNavTab,
+                        onTabSelected = { tab -> viewModel.selectNavTab(tab) }
+                    )
+                }
             },
             bottomBar = {
                 IdeBottomNavigationBar(
@@ -161,7 +162,7 @@ fun IdeMainScreen(
                     .padding(paddingValues)
                     .background(Color(0xFF0C0D15))
             ) {
-                // Switch content based on active Bottom Navigation Tab
+                // First-Class Dedicated Pages (Clean, isolated, non-overlapping)
                 when (uiState.currentNavTab) {
                     MainNavTab.EDITOR -> {
                         EditorMainContent(
@@ -177,15 +178,63 @@ fun IdeMainScreen(
                                 viewModel.openFile(file)
                                 viewModel.selectNavTab(MainNavTab.EDITOR)
                             },
-                            onNewFileClick = {
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Crear archivo en proyecto")
-                                }
+                            onNewFileClick = { showNewFileDialog = true },
+                            onNewFolderClick = { showNewFolderDialog = true },
+                            onRefreshClick = {
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Árbol de archivos sincronizado") }
+                            },
+                            onDeleteFile = { file ->
+                                viewModel.deleteFile(file)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Eliminado: ${file.name}") }
                             }
                         )
                     }
+                    MainNavTab.AI_ASSISTANT -> {
+                        AiAssistantPanel(
+                            selectedProvider = uiState.selectedAiProvider,
+                            onSelectProvider = { provider -> viewModel.selectAiProvider(provider) },
+                            activeAgent = uiState.activeAgent,
+                            availableAgents = uiState.availableAgents,
+                            onSelectAgent = { agent -> viewModel.selectLocalAgent(agent) },
+                            aiResponse = uiState.aiResponse,
+                            isAiLoading = uiState.isAiLoading,
+                            onActionClick = { actionId ->
+                                when (actionId) {
+                                    "EXPLAIN" -> viewModel.askAiAssistant("Explica detalladamente la estructura y componentes de este código")
+                                    "GENERATE" -> viewModel.askAiAssistant("Genera un widget o componente Flutter reutilizable en Dart para este archivo")
+                                    "FIND_BUGS" -> viewModel.askAiAssistant("Revisa el código en busca de posibles fallos o advertencias de sintaxis")
+                                    "REFACTOR" -> viewModel.askAiAssistant("Refactoriza y optimiza esta función para mejorar rendimiento y legibilidad")
+                                }
+                            },
+                            onSendMessage = { prompt -> viewModel.askAiAssistant(prompt) },
+                            onInsertCode = { code ->
+                                viewModel.insertAiCodeIntoEditor(code)
+                                viewModel.selectNavTab(MainNavTab.EDITOR)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Código inyectado en el editor") }
+                            },
+                            onClose = { viewModel.selectNavTab(MainNavTab.EDITOR) },
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    MainNavTab.TERMINAL -> {
+                        TerminalScreen(
+                            logs = uiState.consoleLogs,
+                            onSendCommand = { cmd -> viewModel.executeTerminalCommand(cmd) },
+                            onClearLogs = { viewModel.clearTerminalLogs() },
+                            onClose = { viewModel.selectNavTab(MainNavTab.EDITOR) }
+                        )
+                    }
                     MainNavTab.SEARCH -> {
-                        SearchScreen()
+                        SearchScreen(
+                            searchQuery = uiState.searchQuery,
+                            searchMatches = uiState.searchMatches,
+                            onSearchChange = { query -> viewModel.searchInProject(query) },
+                            onMatchClick = { file ->
+                                viewModel.openFile(file)
+                                viewModel.selectNavTab(MainNavTab.EDITOR)
+                            },
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
+                        )
                     }
                     MainNavTab.GIT -> {
                         GitScreen(
@@ -194,36 +243,11 @@ fun IdeMainScreen(
                                 coroutineScope.launch {
                                     snackbarHostState.showSnackbar("Cambios confirmados: $msg")
                                 }
-                            }
+                            },
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
                     }
-                    MainNavTab.SETTINGS -> {
-                        SettingsScreen(
-                            localHost = uiState.localAiHost,
-                            localPort = uiState.localAiPort,
-                            localDashboardPort = uiState.localAiDashboardPort,
-                            selectedModel = uiState.selectedLocalModel,
-                            testStatus = uiState.localAiTestStatus,
-                            onSaveLocalConfig = { host, port, model ->
-                                viewModel.updateLocalAiConfig(host, port, model)
-                                coroutineScope.launch {
-                                    snackbarHostState.showSnackbar("Guardado: $host:$port ($model)")
-                                }
-                            },
-                            onTestConnection = { host, port ->
-                                viewModel.testLocalAiConnection(host, port)
-                            },
-                            onOpenModelManagement = { viewModel.openAiSubPage(AiHubSubPage.MODEL_MANAGEMENT) },
-                            onOpenRuntimeEngine = { viewModel.openAiSubPage(AiHubSubPage.RUNTIME_ENGINE) },
-                            onOpenPluginsRouter = { viewModel.openAiSubPage(AiHubSubPage.PLUGINS_ROUTER) },
-                            onOpenSiloLibrary = { viewModel.openAiSubPage(AiHubSubPage.SILO_LIBRARY) }
-                        )
-                    }
-                }
-
-                // AI Hub Sub-page Full-screen Overlays
-                when (uiState.activeAiSubPage) {
-                    AiHubSubPage.MODEL_MANAGEMENT -> {
+                    MainNavTab.MODELS -> {
                         ModelManagementScreen(
                             installedModels = uiState.installedModels,
                             catalogModels = uiState.catalogModels,
@@ -232,18 +256,60 @@ fun IdeMainScreen(
                             onDeleteModel = { id -> viewModel.deleteModel(id) },
                             onDownloadModel = { item -> viewModel.downloadModel(item) },
                             onImportLocalFile = { name, size -> viewModel.importLocalModel(name, size) },
-                            onBack = { viewModel.closeAiSubPage() }
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
                     }
-                    AiHubSubPage.RUNTIME_ENGINE -> {
+                    MainNavTab.TELEMETRY -> {
                         RuntimeEngineScreen(
                             metrics = uiState.runtimeMetrics,
                             onUpdateConfig = { threads, context, gpu, engine ->
                                 viewModel.updateHardwareConfig(threads, context, gpu, engine)
                             },
-                            onBack = { viewModel.closeAiSubPage() }
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
                     }
+                    MainNavTab.DOCS_RAG -> {
+                        SiloLibraryScreen(
+                            documents = uiState.ragDocuments,
+                            onAddDocument = { name, content -> viewModel.addRagDocument(name, content) },
+                            onRemoveDocument = { id -> viewModel.removeRagDocument(id) },
+                            onSearchChunks = { q -> viewModel.searchRagChunks(q) },
+                            isInjectionEnabled = uiState.isRagInjectionEnabled,
+                            onToggleInjection = { enabled -> viewModel.toggleRagInjection(enabled) },
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
+                        )
+                    }
+                    MainNavTab.SETTINGS -> {
+                        SettingsScreen(
+                            apiKeysConfig = uiState.apiKeysConfig,
+                            localHost = uiState.localAiHost,
+                            localPort = uiState.localAiPort,
+                            localDashboardPort = uiState.localAiDashboardPort,
+                            selectedModel = uiState.selectedLocalModel,
+                            testStatus = uiState.localAiTestStatus,
+                            availableAgents = uiState.availableAgents,
+                            onSaveApiKeys = { cfg ->
+                                viewModel.updateApiKeys(cfg)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Claves de API guardadas") }
+                            },
+                            onSaveLocalConfig = { host, port, model ->
+                                viewModel.updateLocalAiConfig(host, port, model)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración local guardada") }
+                            },
+                            onTestConnection = { host, port ->
+                                viewModel.testLocalAiConnection(host, port)
+                            },
+                            onImportAgentClick = { showImportAgentDialog = true },
+                            onOpenModelManagement = { viewModel.selectNavTab(MainNavTab.MODELS) },
+                            onOpenRuntimeEngine = { viewModel.selectNavTab(MainNavTab.TELEMETRY) },
+                            onOpenPluginsRouter = { viewModel.openAiSubPage(AiHubSubPage.PLUGINS_ROUTER) },
+                            onOpenSiloLibrary = { viewModel.selectNavTab(MainNavTab.DOCS_RAG) }
+                        )
+                    }
+                }
+
+                // AI Hub Sub-page Overlays (for SiloLibrary & Router)
+                when (uiState.activeAiSubPage) {
                     AiHubSubPage.PLUGINS_ROUTER -> {
                         AiPluginsScreen(
                             config = uiState.routerConfig,
@@ -262,215 +328,312 @@ fun IdeMainScreen(
                             onBack = { viewModel.closeAiSubPage() }
                         )
                     }
-                    AiHubSubPage.NONE -> { /* handled by bottom nav tabs */ }
-                }
-
-                // Overlay Terminal when toggled
-                if (uiState.showTerminal) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color(0xFF0A0B10))
-                    ) {
-                        TerminalScreen(
-                            logs = uiState.consoleLogs,
-                            onClose = { viewModel.toggleTerminal() }
-                        )
-                    }
+                    else -> { /* handled by direct MainNavTab */ }
                 }
             }
         }
     }
+
+    // Dialog: New File
+    if (showNewFileDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewFileDialog = false },
+            containerColor = Color(0xFF141522),
+            title = { Text("Crear nuevo archivo", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ingresa el nombre del archivo (ej. service.dart, widget.kt):", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = newFileNameInput,
+                        onValueChange = { newFileNameInput = it },
+                        placeholder = { Text("mi_archivo.dart", color = Color(0xFF64748B)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF7B61FF),
+                            unfocusedBorderColor = Color(0xFF26283C)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newFileNameInput.isNotBlank()) {
+                            viewModel.createNewFile(newFileNameInput)
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Archivo creado: $newFileNameInput") }
+                            newFileNameInput = ""
+                            showNewFileDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
+                ) {
+                    Text("Crear", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewFileDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
+
+    // Dialog: New Folder
+    if (showNewFolderDialog) {
+        AlertDialog(
+            onDismissRequest = { showNewFolderDialog = false },
+            containerColor = Color(0xFF141522),
+            title = { Text("Crear nueva carpeta", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Ingresa el nombre de la carpeta (ej. models, screens, helpers):", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = newFolderNameInput,
+                        onValueChange = { newFolderNameInput = it },
+                        placeholder = { Text("nueva_carpeta", color = Color(0xFF64748B)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF7B61FF),
+                            unfocusedBorderColor = Color(0xFF26283C)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (newFolderNameInput.isNotBlank()) {
+                            viewModel.createNewFolder(newFolderNameInput)
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Carpeta creada: $newFolderNameInput") }
+                            newFolderNameInput = ""
+                            showNewFolderDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
+                ) {
+                    Text("Crear", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showNewFolderDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
+
+    // Dialog: Import Agent from Phone
+    if (showImportAgentDialog) {
+        AlertDialog(
+            onDismissRequest = { showImportAgentDialog = false },
+            containerColor = Color(0xFF141522),
+            title = { Text("Importar Agente Local Antigravity", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold) },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Pega el JSON del agente o las instrucciones (.md) desde tu teléfono:", color = Color(0xFF94A3B8), fontSize = 12.sp)
+                    OutlinedTextField(
+                        value = importAgentNameInput,
+                        onValueChange = { importAgentNameInput = it },
+                        label = { Text("Nombre del Agente", color = Color(0xFF94A3B8), fontSize = 11.sp) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF7B61FF),
+                            unfocusedBorderColor = Color(0xFF26283C)
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    OutlinedTextField(
+                        value = importAgentContentInput,
+                        onValueChange = { importAgentContentInput = it },
+                        placeholder = { Text("Instrucciones del agente o JSON...", color = Color(0xFF64748B)) },
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White,
+                            focusedBorderColor = Color(0xFF7B61FF),
+                            unfocusedBorderColor = Color(0xFF26283C)
+                        ),
+                        modifier = Modifier.fillMaxWidth().height(120.dp)
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        if (importAgentContentInput.isNotBlank()) {
+                            viewModel.importAgentFromPhone(importAgentContentInput, importAgentNameInput.ifBlank { "Agente Teléfono" })
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Agente Antigravity cargado con éxito") }
+                            importAgentContentInput = ""
+                            importAgentNameInput = ""
+                            showImportAgentDialog = false
+                        }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
+                ) {
+                    Text("Cargar Agente", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showImportAgentDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
 }
 
 /**
- * Top App Bar matching Image 1:
- * - Hamburger menu
- * - File badge: Rounded purple square with `< >`, file name `main.dart` with purple dot `•`, subtitle `lib/`
- * - Actions: Play button pill/circle, Sparkles AI button, 3-dots overflow menu
+ * Top App Bar: Minimalist, Intuitive, and Non-Redundant.
  */
 @Composable
 private fun IdeTopAppBar(
     activeFile: ProjectFile,
+    currentTab: MainNavTab,
+    isFileModified: Boolean,
     onMenuClick: () -> Unit,
     onRunClick: () -> Unit,
     onAiSparkleClick: () -> Unit,
     onMoreClick: () -> Unit,
     showMenuOptions: Boolean,
     onDismissMenu: () -> Unit,
+    onSaveFile: () -> Unit,
+    onNewFile: () -> Unit,
+    onNewFolder: () -> Unit,
+    onCloseTab: () -> Unit,
     onOpenTerminal: () -> Unit,
     onLivePreview: () -> Unit,
     onOpenAiSubPage: (AiHubSubPage) -> Unit = {}
 ) {
-    Column(
+    Row(
         modifier = Modifier
             .fillMaxWidth()
+            .height(52.dp)
             .background(Color(0xFF0C0D15))
-            .padding(horizontal = 12.dp, vertical = 6.dp)
+            .padding(horizontal = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
     ) {
+        // Left: Drawer Toggle
+        IconButton(onClick = onMenuClick, modifier = Modifier.size(38.dp)) {
+            Icon(Icons.Default.Menu, contentDescription = "Menú", tint = Color.White, modifier = Modifier.size(24.dp))
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Center: File Badge / Page Title
         Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(48.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+                .weight(1f)
+                .clickable { onMenuClick() },
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            // Left: Hamburger Menu
-            IconButton(
-                onClick = onMenuClick,
-                modifier = Modifier.size(38.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Menu,
-                    contentDescription = "Menu",
-                    tint = Color.White,
-                    modifier = Modifier.size(24.dp)
-                )
-            }
+            BlackCatLogo(size = 32.dp, shape = RoundedCornerShape(8.dp))
+            Spacer(modifier = Modifier.width(10.dp))
 
-            Spacer(modifier = Modifier.width(6.dp))
+            Column {
+                val titleText = when (currentTab) {
+                    MainNavTab.EDITOR -> activeFile.name
+                    MainNavTab.FILES -> "Archivos"
+                    MainNavTab.AI_ASSISTANT -> "✨ Antigravity AI"
+                    MainNavTab.TERMINAL -> "Terminal (bash)"
+                    MainNavTab.SEARCH -> "Buscar"
+                    MainNavTab.GIT -> "Git"
+                    MainNavTab.MODELS -> "Gestor de Modelos"
+                    MainNavTab.TELEMETRY -> "Telemetría & RAM"
+                    MainNavTab.DOCS_RAG -> "Base de Conocimiento RAG"
+                    MainNavTab.SETTINGS -> "Ajustes"
+                }
 
-            // Center-Left: File Badge with purple rounded icon + file info
-            Row(
-                modifier = Modifier
-                    .weight(1f)
-                    .clickable { onMenuClick() },
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                // Official Black Cat IDE Logo
-                com.ide.mobile.ui.components.BlackCatLogo(
-                    size = 36.dp,
-                    shape = RoundedCornerShape(8.dp)
-                )
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = activeFile.name,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White
-                        )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = titleText,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+                    if (currentTab == MainNavTab.EDITOR) {
                         Spacer(modifier = Modifier.width(6.dp))
-                        // Purple active / unsaved dot
                         Box(
                             modifier = Modifier
-                                .size(6.dp)
-                                .background(Color(0xFF8B5CF6), CircleShape)
+                                .size(7.dp)
+                                .background(
+                                    if (isFileModified) Color(0xFFFBBF24) else Color(0xFF7B61FF),
+                                    CircleShape
+                                )
                         )
                     }
-
-                    val dirSubtitle = if (activeFile.path.contains("/lib/")) {
-                        "lib/"
-                    } else {
-                        val parts = activeFile.path.trim('/').split('/')
-                        if (parts.size > 1) "${parts[parts.size - 2]}/" else "root/"
-                    }
-
-                    Text(
-                        text = dirSubtitle,
-                        fontSize = 11.sp,
-                        color = Color(0xFF64748B)
-                    )
                 }
+
+                val subtitleText = if (currentTab == MainNavTab.EDITOR) {
+                    if (isFileModified) "modificado" else "lib/"
+                } else {
+                    "Black Cat IDE • J.COMPE"
+                }
+
+                Text(
+                    text = subtitleText,
+                    fontSize = 10.sp,
+                    color = if (isFileModified && currentTab == MainNavTab.EDITOR) Color(0xFFFBBF24) else Color(0xFF64748B)
+                )
+            }
+        }
+
+        // Right Actions (Clean, spacious, non-overlapping)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // Play Button
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0xFF1E2238), CircleShape)
+                    .clickable { onRunClick() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.PlayArrow, contentDescription = "Ejecutar", tint = Color(0xFF60A5FA), modifier = Modifier.size(22.dp))
             }
 
-            // Right Actions: Play button, Sparkles AI button, More Options (⋮)
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                // Play Button (pill / dark rounded circle with blue play icon)
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFF1E2238), CircleShape)
-                        .clickable { onRunClick() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.PlayArrow,
-                        contentDescription = "Ejecutar",
-                        tint = Color(0xFF60A5FA),
-                        modifier = Modifier.size(22.dp)
-                    )
+            // Overflow Menu
+            Box {
+                IconButton(onClick = onMoreClick, modifier = Modifier.size(36.dp)) {
+                    Icon(Icons.Default.MoreVert, contentDescription = "Más opciones", tint = Color.White, modifier = Modifier.size(20.dp))
                 }
 
-                // AI Sparkles Button
-                Box(
-                    modifier = Modifier
-                        .size(36.dp)
-                        .background(Color(0xFF1E1F30), CircleShape)
-                        .clickable { onAiSparkleClick() },
-                    contentAlignment = Alignment.Center
+                DropdownMenu(
+                    expanded = showMenuOptions,
+                    onDismissRequest = onDismissMenu,
+                    modifier = Modifier.background(Color(0xFF141522))
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoFixHigh,
-                        contentDescription = "AI Assistant",
-                        tint = Color(0xFFC084FC),
-                        modifier = Modifier.size(18.dp)
+                    DropdownMenuItem(
+                        text = { Text("💾 Guardar archivo", color = Color.White) },
+                        onClick = onSaveFile
                     )
-                }
-
-                // 3-dots Menu
-                Box {
-                    IconButton(
-                        onClick = onMoreClick,
-                        modifier = Modifier.size(36.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.MoreVert,
-                            contentDescription = "Más opciones",
-                            tint = Color.White,
-                            modifier = Modifier.size(20.dp)
-                        )
-                    }
-
-                    DropdownMenu(
-                        expanded = showMenuOptions,
-                        onDismissRequest = onDismissMenu,
-                        modifier = Modifier.background(Color(0xFF181926))
-                    ) {
-                        DropdownMenuItem(
-                            text = { Text("Abrir Terminal", color = Color.White) },
-                            onClick = onOpenTerminal
-                        )
-                        DropdownMenuItem(
-                            text = { Text("Vista previa en vivo", color = Color.White) },
-                            onClick = onLivePreview
-                        )
-                        HorizontalDivider(color = Color(0xFF2E324E), thickness = 0.5.dp)
-                        DropdownMenuItem(
-                            text = { Text("📦 Gestor de Modelos", color = Color(0xFFC084FC)) },
-                            onClick = {
-                                onOpenAiSubPage(AiHubSubPage.MODEL_MANAGEMENT)
-                                onDismissMenu()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("⚡ Motor & Telemetría", color = Color(0xFF34D399)) },
-                            onClick = {
-                                onOpenAiSubPage(AiHubSubPage.RUNTIME_ENGINE)
-                                onDismissMenu()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("🔀 Smart Router & Plugins", color = Color(0xFF38BDF8)) },
-                            onClick = {
-                                onOpenAiSubPage(AiHubSubPage.PLUGINS_ROUTER)
-                                onDismissMenu()
-                            }
-                        )
-                        DropdownMenuItem(
-                            text = { Text("📚 SiloLibrary (RAG)", color = Color(0xFFFBBF24)) },
-                            onClick = {
-                                onOpenAiSubPage(AiHubSubPage.SILO_LIBRARY)
-                                onDismissMenu()
-                            }
-                        )
-                    }
+                    DropdownMenuItem(
+                        text = { Text("📄 Nuevo archivo...", color = Color.White) },
+                        onClick = onNewFile
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📁 Nueva carpeta...", color = Color.White) },
+                        onClick = onNewFolder
+                    )
+                    DropdownMenuItem(
+                        text = { Text("✕ Cerrar pestaña", color = Color(0xFFF87171)) },
+                        onClick = onCloseTab
+                    )
+                    HorizontalDivider(color = Color(0xFF222436), thickness = 0.5.dp)
+                    DropdownMenuItem(
+                        text = { Text("💻 Abrir Terminal", color = Color(0xFF34D399)) },
+                        onClick = onOpenTerminal
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📱 Vista Previa en Vivo", color = Color(0xFF38BDF8)) },
+                        onClick = onLivePreview
+                    )
                 }
             }
         }
@@ -478,17 +641,14 @@ private fun IdeTopAppBar(
 }
 
 /**
- * Editor Tabs Row matching Image 1:
- * - `main.dart` with glowing purple underline
- * - `theme.dart` (grey inactive)
- * - `router.dart` (grey inactive)
- * - Right icon: Split layout `◫`
+ * Editor Tabs Row with Tab Close (✕) action.
  */
 @Composable
 private fun EditorTabsRow(
     openTabs: List<ProjectFile>,
     activeFile: ProjectFile,
     onTabSelect: (ProjectFile) -> Unit,
+    onCloseTab: (ProjectFile) -> Unit,
     onSplitViewClick: () -> Unit
 ) {
     Row(
@@ -496,7 +656,7 @@ private fun EditorTabsRow(
             .fillMaxWidth()
             .height(40.dp)
             .background(Color(0xFF0C0D15))
-            .padding(horizontal = 16.dp),
+            .padding(horizontal = 12.dp),
         verticalAlignment = Alignment.CenterVertically
     ) {
         Row(
@@ -504,63 +664,48 @@ private fun EditorTabsRow(
                 .weight(1f)
                 .horizontalScroll(rememberScrollState()),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(16.dp)
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             openTabs.forEach { tab ->
                 val isActive = tab.id == activeFile.id
-                Column(
+                Row(
                     modifier = Modifier
                         .fillMaxHeight()
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(if (isActive) Color(0xFF191B2E) else Color.Transparent)
                         .clickable { onTabSelect(tab) }
-                        .padding(horizontal = 4.dp),
-                    verticalArrangement = Arrangement.Center
+                        .padding(horizontal = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Spacer(modifier = Modifier.weight(1f))
                     Text(
                         text = tab.name,
-                        fontSize = 13.sp,
+                        fontSize = 12.sp,
                         fontWeight = if (isActive) FontWeight.SemiBold else FontWeight.Normal,
                         color = if (isActive) Color.White else Color(0xFF64748B)
                     )
-                    Spacer(modifier = Modifier.weight(1f))
 
-                    // Active purple underline
-                    if (isActive) {
-                        Box(
-                            modifier = Modifier
-                                .width(56.dp)
-                                .height(2.5.dp)
-                                .background(Color(0xFF7B61FF), RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp))
-                        )
-                    } else {
-                        Spacer(modifier = Modifier.height(2.5.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+
+                    if (openTabs.size > 1) {
+                        IconButton(
+                            onClick = { onCloseTab(tab) },
+                            modifier = Modifier.size(16.dp)
+                        ) {
+                            Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color(0xFF64748B), modifier = Modifier.size(12.dp))
+                        }
                     }
                 }
             }
         }
 
-        // Far right: Split screen / dual panel icon
-        IconButton(
-            onClick = onSplitViewClick,
-            modifier = Modifier.size(32.dp)
-        ) {
-            Icon(
-                imageVector = Icons.Default.VerticalSplit,
-                contentDescription = "Dividir vista",
-                tint = Color(0xFF64748B),
-                modifier = Modifier.size(18.dp)
-            )
+        IconButton(onClick = onSplitViewClick, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Default.VerticalSplit, contentDescription = "Dividir vista", tint = Color(0xFF64748B), modifier = Modifier.size(18.dp))
         }
     }
 }
 
 /**
- * Editor Main Content (Image 1):
- * - Tabs row at top
- * - Code editor in center with line numbers & active line 13 accent
- * - Floating AI FAB at bottom right
- * - Docked AI Assistant bottom sheet panel
- * - Virtual accessory keyboard bar with quickfix
+ * Editor Main Content with zero overlapping buttons!
  */
 @Composable
 private fun EditorMainContent(
@@ -571,17 +716,16 @@ private fun EditorMainContent(
     val diagState = uiState.diagnosticsState
 
     Column(modifier = Modifier.fillMaxSize()) {
-        // Horizontal Tabs Bar
         EditorTabsRow(
             openTabs = uiState.openTabs,
             activeFile = uiState.activeFile,
             onTabSelect = { viewModel.openFile(it) },
+            onCloseTab = { viewModel.closeTab(it) },
             onSplitViewClick = { viewModel.toggleLivePreview() }
         )
 
         HorizontalDivider(color = Color(0xFF181A28), thickness = 1.dp)
 
-        // Main Editor Area with Floating AI FAB
         Box(
             modifier = Modifier
                 .weight(1f)
@@ -589,11 +733,7 @@ private fun EditorMainContent(
         ) {
             if (uiState.showLivePreview) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Box(
-                        modifier = Modifier
-                            .weight(0.55f)
-                            .fillMaxWidth()
-                    ) {
+                    Box(modifier = Modifier.weight(0.55f).fillMaxWidth()) {
                         CodeEditorCore(
                             textFieldValue = uiState.editorValue,
                             onValueChange = { viewModel.onEditorChange(it) },
@@ -603,11 +743,7 @@ private fun EditorMainContent(
                         )
                     }
                     HorizontalDivider(color = Color(0xFF181A28), thickness = 2.dp)
-                    Box(
-                        modifier = Modifier
-                            .weight(0.45f)
-                            .fillMaxWidth()
-                    ) {
+                    Box(modifier = Modifier.weight(0.45f).fillMaxWidth()) {
                         LiveComposePreviewHost(code = uiState.editorValue.text)
                     }
                 }
@@ -620,285 +756,157 @@ private fun EditorMainContent(
                     fontSize = 13.sp
                 )
             }
-
-            // Signature watermark: "BLACK CAT IDE • J.COMPE"
-            com.ide.mobile.ui.components.BlackCatEditorWatermark(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .padding(top = 8.dp, end = 12.dp)
-            )
-
-            // Floating Glowing AI FAB (bottom right of editor, matching Image 1)
-            if (!uiState.showAiPanel) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 18.dp, bottom = 18.dp)
-                        .size(54.dp)
-                        .background(
-                            brush = Brush.linearGradient(
-                                listOf(Color(0xFF8B5CF6), Color(0xFF38BDF8))
-                            ),
-                            shape = CircleShape
-                        )
-                        .clickable { viewModel.toggleAiPanel() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.AutoFixHigh,
-                        contentDescription = "Abrir Asistente IA",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
         }
 
-        // Docked AI Assistant Bottom Panel (exact replica from Image 1)
-        AnimatedVisibility(
-            visible = uiState.showAiPanel,
-            enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-            exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-        ) {
-            Column(modifier = Modifier.fillMaxWidth()) {
-                // AI Response Banner if available
-                if (uiState.isAiLoading || !uiState.aiResponse.isNullOrBlank()) {
-                    Surface(
-                        color = Color(0xFF141624),
-                        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 8.dp)
-                            .border(1.dp, Color(0xFF2E3250), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
-                    ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween,
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    if (uiState.isAiLoading) {
-                                        CircularProgressIndicator(
-                                            modifier = Modifier.size(16.dp),
-                                            color = Color(0xFF8B5CF6),
-                                            strokeWidth = 2.dp
-                                        )
-                                        Spacer(modifier = Modifier.width(8.dp))
-                                        Text("Pensando respuesta...", color = Color(0xFF8B5CF6), fontSize = 12.sp)
-                                    } else {
-                                        Icon(
-                                            imageVector = Icons.Default.Check,
-                                            contentDescription = null,
-                                            tint = Color(0xFF34D399),
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                        Spacer(modifier = Modifier.width(6.dp))
-                                        Text("Respuesta del Asistente", color = Color(0xFF34D399), fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                                    }
-                                }
-
-                                Row {
-                                    TextButton(
-                                        onClick = {
-                                            viewModel.insertAiGeneratedCode()
-                                        }
-                                    ) {
-                                        Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color(0xFF7B61FF), modifier = Modifier.size(14.dp))
-                                        Spacer(modifier = Modifier.width(4.dp))
-                                        Text("Insertar", fontSize = 11.sp, color = Color(0xFF7B61FF))
-                                    }
-                                    IconButton(
-                                        onClick = { viewModel.dismissAiAssistant() },
-                                        modifier = Modifier.size(24.dp)
-                                    ) {
-                                        Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF94A3B8), modifier = Modifier.size(16.dp))
-                                    }
-                                }
-                            }
-
-                            uiState.aiResponse?.let { resp ->
-                                Text(
-                                    text = resp,
-                                    color = Color(0xFFE2E8F0),
-                                    fontSize = 12.sp,
-                                    modifier = Modifier.padding(top = 6.dp)
-                                )
-                            }
-                        }
-                    }
-                }
-
-                AiAssistantPanel(
-                    onActionClick = { actionId ->
-                        when (actionId) {
-                            "EXPLAIN" -> viewModel.askAiAssistant("Explica detalladamente la estructura y componentes de este código")
-                            "GENERATE" -> viewModel.askAiAssistant("Genera un widget o componente Flutter reutilizable en Dart para este archivo")
-                            "FIND_BUGS" -> viewModel.askAiAssistant("Revisa el código en busca de posibles fallos o advertencias de sintaxis")
-                            "REFACTOR" -> viewModel.askAiAssistant("Refactoriza y optimiza esta función para mejorar rendimiento y legibilidad")
-                        }
-                    },
-                    onSendMessage = { userPrompt ->
-                        viewModel.askAiAssistant(userPrompt)
-                    },
-                    onClose = { viewModel.toggleAiPanel() },
-                    selectedProvider = uiState.selectedAiProvider,
-                    onSelectProvider = { provider -> viewModel.selectAiProvider(provider) },
-                    selectedLocalModel = uiState.selectedLocalModel,
-                    onSelectLocalModel = { model -> viewModel.selectLocalModel(model) },
-                    onOpenHubPage = { hubId ->
-                        when (hubId) {
-                            "MODELS" -> viewModel.openAiSubPage(AiHubSubPage.MODEL_MANAGEMENT)
-                            "RUNTIME" -> viewModel.openAiSubPage(AiHubSubPage.RUNTIME_ENGINE)
-                            "ROUTER" -> viewModel.openAiSubPage(AiHubSubPage.PLUGINS_ROUTER)
-                            "SILO" -> viewModel.openAiSubPage(AiHubSubPage.SILO_LIBRARY)
-                        }
-                    }
-                )
-            }
-        }
-
-        // Accessory Bar (undo, redo, brackets, quick fix)
-        Column(modifier = Modifier.imePadding()) {
-            diagState.focusedIssue?.let { issue ->
-                Surface(
-                    color = Color(0xFF1E1F30),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.weight(1f)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Warning,
-                                contentDescription = null,
-                                tint = Color(0xFFFBBF24),
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "Línea ${issue.line}: ${issue.message}",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                maxLines = 1
-                            )
-                        }
-                        if (issue.quickFix != null) {
-                            TextButton(
-                                onClick = { viewModel.applyQuickFix(issue.quickFix) },
-                                modifier = Modifier.height(24.dp)
-                            ) {
-                                Text("Corregir", fontSize = 10.sp, color = Color(0xFFC084FC), fontWeight = FontWeight.Bold)
-                            }
-                        }
-                    }
-                }
-            }
-
-            MobileCodeKeyboardBar(
-                currentValue = uiState.editorValue,
-                onValueChange = { viewModel.onEditorChange(it) },
-                onUndo = { viewModel.handleUndo() },
-                onRedo = { viewModel.handleRedo() },
-                canUndo = uiState.canUndo,
-                canRedo = uiState.canRedo,
-                focusedIssue = diagState.focusedIssue,
-                onApplyQuickFix = { viewModel.applyQuickFix(it) }
-            )
-        }
+        // Virtual Accessory Keyboard Bar (No overlapping FAB!)
+        MobileCodeKeyboardBar(
+            currentValue = uiState.editorValue,
+            onValueChange = { viewModel.onEditorChange(it) },
+            onUndo = { viewModel.undo() },
+            onRedo = { viewModel.redo() },
+            canUndo = uiState.canUndo,
+            canRedo = uiState.canRedo,
+            focusedIssue = diagState.issues.firstOrNull { it.quickFix != null },
+            onApplyQuickFix = { fix -> viewModel.applyQuickFix(fix) }
+        )
     }
 }
 
 /**
- * 5-Tab Bottom Navigation Bar matching Image 1 & Image 2:
- * 1. Editor (< >)
- * 2. Archivos (Folder)
- * 3. Buscar (Search)
- * 4. Git (AccountTree)
- * 5. Ajustes (Settings)
- *
- * Plus Android home pill indicator at bottom.
+ * Bottom Navigation Bar: Clean, modern, distinct icons and clear text labels.
  */
 @Composable
 private fun IdeBottomNavigationBar(
     selectedTab: MainNavTab,
     onTabSelected: (MainNavTab) -> Unit
 ) {
-    val items = listOf(
-        NavigationItem(MainNavTab.EDITOR, "Editor", Icons.Default.Code),
-        NavigationItem(MainNavTab.FILES, "Archivos", Icons.Default.Folder),
-        NavigationItem(MainNavTab.SEARCH, "Buscar", Icons.Default.Search),
-        NavigationItem(MainNavTab.GIT, "Git", Icons.Default.AccountTree),
-        NavigationItem(MainNavTab.SETTINGS, "Ajustes", Icons.Default.Settings)
-    )
-
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFF0C0D15))
-            .border(0.5.dp, Color(0xFF181A28), RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp))
+    Surface(
+        color = Color(0xFF0C0D15),
+        modifier = Modifier.fillMaxWidth().height(56.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF1E2135))
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(56.dp)
-                .padding(horizontal = 8.dp),
+            modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.SpaceAround,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            items.forEach { item ->
-                val isSelected = selectedTab == item.tab
-                val tint = if (isSelected) Color(0xFF7B61FF) else Color(0xFF64748B)
+            val tabs = listOf(
+                Triple(MainNavTab.EDITOR, Icons.Default.Code, "Editor"),
+                Triple(MainNavTab.FILES, Icons.Default.Folder, "Archivos"),
+                Triple(MainNavTab.AI_ASSISTANT, Icons.Default.AutoFixHigh, "IA & Agentes"),
+                Triple(MainNavTab.TERMINAL, Icons.Default.Terminal, "Terminal"),
+                Triple(MainNavTab.SETTINGS, Icons.Default.Settings, "Ajustes")
+            )
 
+            tabs.forEach { (tab, icon, label) ->
+                val isSelected = selectedTab == tab
                 Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
-                        .clickable { onTabSelected(item.tab) }
+                        .clickable { onTabSelected(tab) },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = item.icon,
-                        contentDescription = item.label,
-                        tint = tint,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (isSelected) Color(0xFF7B61FF) else Color(0xFF64748B),
+                        modifier = Modifier.size(20.dp)
                     )
-                    Spacer(modifier = Modifier.height(3.dp))
+                    Spacer(modifier = Modifier.height(2.dp))
                     Text(
-                        text = item.label,
+                        text = label,
                         fontSize = 10.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
-                        color = tint
+                        color = if (isSelected) Color(0xFF7B61FF) else Color(0xFF64748B),
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                     )
                 }
             }
         }
+    }
+}
 
-        // Android bottom home indicator pill
-        Box(
+/**
+ * Category Navigation Bar: Sleek horizontal scrollable pill row for instant switching across all 10 pages.
+ * Crystal-clear icons, Spanish text labels, active glowing indicators, zero overlapping icons.
+ */
+@Composable
+private fun IdeCategoryNavBar(
+    selectedTab: MainNavTab,
+    onTabSelected: (MainNavTab) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val allPages = listOf(
+        Triple(MainNavTab.EDITOR, Icons.Default.Code, "Editor"),
+        Triple(MainNavTab.FILES, Icons.Default.Folder, "Archivos"),
+        Triple(MainNavTab.AI_ASSISTANT, Icons.Default.AutoFixHigh, "IA Agentes"),
+        Triple(MainNavTab.TERMINAL, Icons.Default.Terminal, "Terminal"),
+        Triple(MainNavTab.SEARCH, Icons.Default.Search, "Buscar"),
+        Triple(MainNavTab.GIT, Icons.Default.AccountTree, "Git"),
+        Triple(MainNavTab.MODELS, Icons.Default.CloudDownload, "Modelos"),
+        Triple(MainNavTab.TELEMETRY, Icons.Default.Speed, "Telemetría"),
+        Triple(MainNavTab.DOCS_RAG, Icons.Default.MenuBook, "Docs RAG"),
+        Triple(MainNavTab.SETTINGS, Icons.Default.Settings, "Ajustes")
+    )
+
+    Surface(
+        color = Color(0xFF0C0D15),
+        modifier = modifier.fillMaxWidth().height(42.dp),
+        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF1E2135))
+    ) {
+        Row(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(18.dp),
-            contentAlignment = Alignment.Center
+                .fillMaxSize()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .width(134.dp)
-                    .height(4.dp)
-                    .background(Color(0xFFE2E8F0), RoundedCornerShape(2.dp))
-            )
+            allPages.forEach { (tab, icon, label) ->
+                val isSelected = selectedTab == tab
+                val iconTint = when (tab) {
+                    MainNavTab.EDITOR -> Color(0xFF818CF8)
+                    MainNavTab.FILES -> Color(0xFFFBBF24)
+                    MainNavTab.AI_ASSISTANT -> Color(0xFFC084FC)
+                    MainNavTab.TERMINAL -> Color(0xFF34D399)
+                    MainNavTab.SEARCH -> Color(0xFF38BDF8)
+                    MainNavTab.GIT -> Color(0xFFFB923C)
+                    MainNavTab.MODELS -> Color(0xFFF472B6)
+                    MainNavTab.TELEMETRY -> Color(0xFF4ADE80)
+                    MainNavTab.DOCS_RAG -> Color(0xFFA78BFA)
+                    MainNavTab.SETTINGS -> Color(0xFF94A3B8)
+                }
+
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) Color(0xFF26193E) else Color(0xFF141522))
+                        .border(
+                            width = if (isSelected) 1.dp else 0.5.dp,
+                            color = if (isSelected) Color(0xFF7B61FF) else Color(0xFF26283C),
+                            shape = RoundedCornerShape(8.dp)
+                        )
+                        .clickable { onTabSelected(tab) }
+                        .padding(horizontal = 10.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = label,
+                        tint = if (isSelected) Color.White else iconTint,
+                        modifier = Modifier.size(14.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = label,
+                        fontSize = 11.sp,
+                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                        color = if (isSelected) Color.White else Color(0xFF94A3B8)
+                    )
+                }
+            }
         }
     }
 }
 
-private data class NavigationItem(
-    val tab: MainNavTab,
-    val label: String,
-    val icon: ImageVector
-)

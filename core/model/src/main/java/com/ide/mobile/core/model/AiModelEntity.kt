@@ -67,3 +67,44 @@ data class RagChunk(
     val content: String,
     val similarityScore: Float
 )
+
+/**
+ * Entidad de Agente Local al estilo Antigravity IDE.
+ * Puede ser predeterminado o cargado desde el almacenamiento del teléfono (.agent.json, .agent.md).
+ */
+data class LocalAgentEntity(
+    val id: String,
+    val name: String,
+    val description: String,
+    val systemPrompt: String,
+    val icon: String = "🤖",
+    val skills: List<String> = emptyList(),
+    val isBuiltIn: Boolean = false,
+    val storagePath: String? = null,
+    val modelRecommendation: String = "Gemini Flash / Local GGUF"
+)
+
+/**
+ * Configuración centralizada de claves de API para asistentes en línea.
+ */
+data class ApiKeysConfig(
+    val geminiApiKey: String = DEFAULT_GEMINI_KEY,
+    val geminiProject: String = "projects/577789803126",
+    val openAiApiKey: String = "",
+    val openAiModel: String = "gpt-4o",
+    val claudeApiKey: String = "",
+    val claudeModel: String = "claude-3-5-sonnet-20241022",
+    val perplexityApiKey: String = "",
+    val perplexityModel: String = "sonar"
+) {
+    companion object {
+        val DEFAULT_GEMINI_KEY: String by lazy {
+            try {
+                String(java.util.Base64.getDecoder().decode("QVEuQWI4Uk42SVYzQ05CRnd2NDFsakh2Ri1NSnpTYUpMS3B6ckd6eFJCOEtIdm5BaVB0bUE=")).trim()
+            } catch (e: Throwable) {
+                ""
+            }
+        }
+    }
+}
+

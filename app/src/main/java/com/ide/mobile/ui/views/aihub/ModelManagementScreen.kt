@@ -16,7 +16,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -40,7 +39,7 @@ fun ModelManagementScreen(
 ) {
     var selectedFilter by remember { mutableStateOf("TODOS") }
     var showImportDialog by remember { mutableStateOf(false) }
-    var importFileName by remember { mutableStateOf("mi_modelo_personalizado.gguf") }
+    var importFileName by remember { mutableStateOf("custom_model.gguf") }
     var importFileSizeMb by remember { mutableStateOf("1200") }
 
     val filteredInstalled = remember(installedModels, selectedFilter) {
@@ -197,8 +196,16 @@ fun ModelManagementScreen(
             }
 
             items(catalogModels) { catalogItem ->
+                val isAlreadyInstalledOrDownloading = installedModels.any { it.name == catalogItem.name || it.id == catalogItem.id }
+                val installedVersion = installedModels.firstOrNull { it.name == catalogItem.name || it.id == catalogItem.id }
+                val isDownloading = installedVersion?.status == ModelStatus.DOWNLOADING || catalogItem.status == ModelStatus.DOWNLOADING
+
                 CatalogModelCard(
                     model = catalogItem,
+                    isDownloading = isDownloading,
+                    isInstalled = isAlreadyInstalledOrDownloading && !isDownloading,
+                    downloadProgress = installedVersion?.downloadProgress ?: catalogItem.downloadProgress,
+                    downloadSpeed = installedVersion?.downloadSpeed ?: "",
                     onDownload = { onDownloadModel(catalogItem) }
                 )
             }
@@ -222,7 +229,7 @@ fun ModelManagementScreen(
         }
     }
 
-    // Import Dialog Simulation
+    // Import Dialog
     if (showImportDialog) {
         AlertDialog(
             onDismissRequest = { showImportDialog = false },
@@ -252,7 +259,7 @@ fun ModelManagementScreen(
                     OutlinedTextField(
                         value = importFileSizeMb,
                         onValueChange = { importFileSizeMb = it },
-                        label = { Text("Tamaño estimado (MB)", color = Color(0xFF94A3B8), fontSize = 11.sp) },
+                        label = { Text("Tamaño aproximado (MB)", color = Color(0xFF94A3B8), fontSize = 11.sp) },
                         colors = OutlinedTextFieldDefaults.colors(
                             focusedTextColor = Color.White,
                             unfocusedTextColor = Color.White,
@@ -266,13 +273,13 @@ fun ModelManagementScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val mb = importFileSizeMb.toLongOrNull() ?: 1000L
-                        onImportLocalFile(importFileName, mb * 1024 * 1024)
+                        val sizeMb = importFileSizeMb.toLongOrNull() ?: 1200L
+                        onImportLocalFile(importFileName, sizeMb * 1024 * 1024)
                         showImportDialog = false
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
                 ) {
-                    Text("Importar al IDE", color = Color.White)
+                    Text("Registrar Modelo", color = Color.White)
                 }
             },
             dismissButton = {
@@ -285,16 +292,16 @@ fun ModelManagementScreen(
 }
 
 @Composable
-private fun FilterChip(label: String, selected: Boolean, onClick: () -> Unit) {
+private fun FilterChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
     Box(
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
             .background(if (selected) Color(0xFF7B61FF) else Color(0xFF141522))
-            .border(
-                1.dp,
-                if (selected) Color(0xFF907AFF) else Color(0xFF26283C),
-                RoundedCornerShape(20.dp)
-            )
+            .border(1.dp, if (selected) Color(0xFF7B61FF) else Color(0xFF26283C), RoundedCornerShape(20.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     ) {
@@ -324,21 +331,24 @@ private fun InstalledModelCard(
             .background(Color(0xFF141522))
             .border(
                 1.dp,
-                if (isRunning) Color(0xFF34D399) else Color(0xFF26283C),
+                if (isRunning) Color(0xFF7B61FF) else Color(0xFF26283C),
                 RoundedCornerShape(12.dp)
             )
             .padding(14.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            // Header: Name + Badge
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Name and format
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
-                    Text(model.type.icon, fontSize = 16.sp)
-                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = model.type.icon,
+                        fontSize = 18.sp,
+                        modifier = Modifier.padding(end = 8.dp)
+                    )
                     Column {
                         Text(
                             text = model.name,
@@ -418,14 +428,14 @@ private fun InstalledModelCard(
                         modifier = Modifier
                             .size(8.dp)
                             .background(
-                                if (isRunning) Color(0xFF34D399) else Color(0xFF94A3B8),
+                                if (isRunning) Color(0xFF34D399) else if (isDownloading) Color(0xFFC084FC) else Color(0xFF94A3B8),
                                 CircleShape
                             )
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = if (isRunning) "Activo en memoria" else if (isDownloading) "Descargando..." else "Listo para cargar",
-                        color = if (isRunning) Color(0xFF34D399) else Color(0xFF94A3B8),
+                        color = if (isRunning) Color(0xFF34D399) else if (isDownloading) Color(0xFFC084FC) else Color(0xFF94A3B8),
                         fontSize = 11.sp,
                         fontWeight = FontWeight.Medium
                     )
@@ -468,6 +478,10 @@ private fun InstalledModelCard(
 @Composable
 private fun CatalogModelCard(
     model: ModelItem,
+    isDownloading: Boolean,
+    isInstalled: Boolean,
+    downloadProgress: Float,
+    downloadSpeed: String,
     onDownload: () -> Unit
 ) {
     Box(
@@ -475,48 +489,77 @@ private fun CatalogModelCard(
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(Color(0xFF10121D))
-            .border(1.dp, Color(0xFF1E2135), RoundedCornerShape(12.dp))
+            .border(1.dp, if (isDownloading) Color(0xFF7B61FF) else Color(0xFF1E2135), RoundedCornerShape(12.dp))
             .padding(14.dp)
     ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = model.name,
-                    color = Color.White,
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${model.sizeDisplay} • ${model.format.displayName} • ${model.quantization}",
-                    color = Color(0xFF94A3B8),
-                    fontSize = 10.sp
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = model.description,
-                    color = Color(0xFF64748B),
-                    fontSize = 10.sp,
-                    maxLines = 2
-                )
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = model.name,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${model.sizeDisplay} • ${model.format.displayName} • ${model.quantization}",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 10.sp
+                    )
+                    Spacer(modifier = Modifier.height(2.dp))
+                    Text(
+                        text = model.description,
+                        color = Color(0xFF64748B),
+                        fontSize = 10.sp,
+                        maxLines = 2
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(8.dp))
+
+                if (isDownloading) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF26193E), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("Descargando...", color = Color(0xFFC084FC), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else if (isInstalled) {
+                    Box(
+                        modifier = Modifier
+                            .background(Color(0xFF143026), RoundedCornerShape(8.dp))
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                    ) {
+                        Text("✓ Instalado", color = Color(0xFF34D399), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    Button(
+                        onClick = onDownload,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1638)),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B61FF).copy(alpha = 0.5f)),
+                        shape = RoundedCornerShape(8.dp),
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
+                        modifier = Modifier.height(32.dp)
+                    ) {
+                        Icon(Icons.Default.Download, contentDescription = null, tint = Color(0xFFD8B4FE), modifier = Modifier.size(14.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Descargar", color = Color(0xFFD8B4FE), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
             }
 
-            Spacer(modifier = Modifier.width(8.dp))
-
-            Button(
-                onClick = onDownload,
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1E1638)),
-                border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF7B61FF).copy(alpha = 0.5f)),
-                shape = RoundedCornerShape(8.dp),
-                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
-                modifier = Modifier.height(32.dp)
-            ) {
-                Icon(Icons.Default.Download, contentDescription = null, tint = Color(0xFFD8B4FE), modifier = Modifier.size(14.dp))
-                Spacer(modifier = Modifier.width(4.dp))
-                Text("Descargar", color = Color(0xFFD8B4FE), fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            if (isDownloading) {
+                LinearProgressIndicator(
+                    progress = { downloadProgress },
+                    modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)),
+                    color = Color(0xFF7B61FF),
+                    trackColor = Color(0xFF26283C)
+                )
             }
         }
     }
