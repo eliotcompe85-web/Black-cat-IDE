@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -27,6 +28,9 @@ import com.ide.mobile.feature.compiler.LiveComposePreviewHost
 import com.ide.mobile.feature.editor.CodeEditorCore
 import com.ide.mobile.feature.explorer.ProjectExplorerDrawer
 import com.ide.mobile.feature.keyboard.MobileCodeKeyboardBar
+import com.ide.mobile.core.model.ProjectTemplate
+import com.ide.mobile.ui.components.CommandPaletteAction
+import com.ide.mobile.ui.components.CommandPaletteDialog
 import com.ide.mobile.ui.components.BlackCatEditorWatermark
 import com.ide.mobile.ui.components.BlackCatLogo
 import com.ide.mobile.ui.views.FilesScreen
@@ -57,6 +61,7 @@ fun IdeMainScreen(
     var showNewFileDialog by remember { mutableStateOf(false) }
     var showNewFolderDialog by remember { mutableStateOf(false) }
     var showImportAgentDialog by remember { mutableStateOf(false) }
+    var showTemplatesDialog by remember { mutableStateOf(false) }
 
     var newFileNameInput by remember { mutableStateOf("") }
     var newFolderNameInput by remember { mutableStateOf("") }
@@ -106,11 +111,21 @@ fun IdeMainScreen(
                         currentTab = uiState.currentNavTab,
                         isFileModified = uiState.isFileModified,
                         onMenuClick = { coroutineScope.launch { drawerState.open() } },
-                        onRunClick = { viewModel.runProject() },
+                        onRunClick = { viewModel.runSmartRunner() },
                         onAiSparkleClick = { viewModel.selectNavTab(MainNavTab.AI_ASSISTANT) },
                         onMoreClick = { showMenuOptions = true },
                         showMenuOptions = showMenuOptions,
                         onDismissMenu = { showMenuOptions = false },
+                        onOpenCommandPalette = { viewModel.toggleCommandPalette(true) },
+                        onFormatCode = {
+                            viewModel.formatCurrentCode()
+                            coroutineScope.launch { snackbarHostState.showSnackbar("Código formateado") }
+                            showMenuOptions = false
+                        },
+                        onOpenTemplates = {
+                            showTemplatesDialog = true
+                            showMenuOptions = false
+                        },
                         onSaveFile = {
                             val saved = viewModel.saveCurrentFile()
                             coroutineScope.launch { snackbarHostState.showSnackbar("Guardado: $saved") }
@@ -186,7 +201,8 @@ fun IdeMainScreen(
                             onDeleteFile = { file ->
                                 viewModel.deleteFile(file)
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Eliminado: ${file.name}") }
-                            }
+                            },
+                            onTemplatesClick = { showTemplatesDialog = true }
                         )
                     }
                     MainNavTab.AI_ASSISTANT -> {
@@ -522,6 +538,196 @@ fun IdeMainScreen(
             }
         )
     }
+
+    if (uiState.showCommandPalette) {
+        val actions = listOf(
+            CommandPaletteAction(
+                id = "run_smart",
+                title = "▶ Ejecutar Proyecto / Archivo",
+                subtitle = "Ejecuta con medición de tiempo o vista previa",
+                icon = Icons.Default.PlayArrow,
+                tint = Color(0xFF60A5FA),
+                onExecute = { viewModel.runSmartRunner() }
+            ),
+            CommandPaletteAction(
+                id = "format_code",
+                title = "🪄 Formatear Código",
+                subtitle = "Corrige indentación y estilo en el editor",
+                icon = Icons.Default.AutoAwesome,
+                tint = Color(0xFFA78BFA),
+                onExecute = {
+                    viewModel.formatCurrentCode()
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Código formateado") }
+                }
+            ),
+            CommandPaletteAction(
+                id = "save_file",
+                title = "💾 Guardar Archivo Actual",
+                subtitle = uiState.activeFile.path,
+                icon = Icons.Default.Save,
+                tint = Color(0xFF34D399),
+                onExecute = {
+                    viewModel.saveCurrentFile()
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Archivo guardado") }
+                }
+            ),
+            CommandPaletteAction(
+                id = "git_push",
+                title = "⬆️ Subir Cambios a GitHub",
+                subtitle = "Push a ${uiState.gitHubConfig.defaultBranch}",
+                icon = Icons.Default.CloudUpload,
+                tint = Color(0xFFFBBF24),
+                onExecute = { viewModel.selectNavTab(MainNavTab.GIT) }
+            ),
+            CommandPaletteAction(
+                id = "deploy_expo",
+                title = "🚀 Desplegar en Expo Dev",
+                subtitle = "EAS Build para Android",
+                icon = Icons.Default.StayCurrentPortrait,
+                tint = Color(0xFF38BDF8),
+                onExecute = { viewModel.deployToExpoDev() }
+            ),
+            CommandPaletteAction(
+                id = "deploy_railway",
+                title = "🚂 Desplegar en Railway Cloud",
+                subtitle = "Despliegue de microservicio backend",
+                icon = Icons.Default.Dns,
+                tint = Color(0xFFC084FC),
+                onExecute = { viewModel.deployToRailway() }
+            ),
+            CommandPaletteAction(
+                id = "open_terminal",
+                title = "💻 Abrir Terminal Interactiva",
+                subtitle = "Ejecutar comandos bash, npm, flutter o python",
+                icon = Icons.Default.Terminal,
+                tint = Color(0xFF34D399),
+                onExecute = { viewModel.selectNavTab(MainNavTab.TERMINAL) }
+            ),
+            CommandPaletteAction(
+                id = "catalog_agents",
+                title = "📥 Catálogo de Agentes IA",
+                subtitle = "Descargar agentes especializados para desarrollo",
+                icon = Icons.Default.SmartToy,
+                tint = Color(0xFF7B61FF),
+                onExecute = { viewModel.selectNavTab(MainNavTab.AI_ASSISTANT) }
+            ),
+            CommandPaletteAction(
+                id = "toggle_preview",
+                title = "📱 Alternar Vista Previa en Vivo",
+                subtitle = "Visualizar Compose, Web HTML o Markdown",
+                icon = Icons.Default.VerticalSplit,
+                tint = Color(0xFF38BDF8),
+                onExecute = { viewModel.toggleLivePreview() }
+            ),
+            CommandPaletteAction(
+                id = "create_template",
+                title = "📦 Nuevo Proyecto desde Plantilla...",
+                subtitle = "Flutter, Expo React Native, Railway o Python",
+                icon = Icons.Default.AutoAwesomeMotion,
+                tint = Color(0xFFF59E0B),
+                onExecute = { showTemplatesDialog = true }
+            ),
+            CommandPaletteAction(
+                id = "clear_console",
+                title = "🧹 Limpiar Logs de Consola",
+                subtitle = "Vaciar el historial de la terminal",
+                icon = Icons.Default.DeleteSweep,
+                tint = Color(0xFFF87171),
+                onExecute = { viewModel.clearTerminalLogs() }
+            )
+        )
+
+        CommandPaletteDialog(
+            rootProject = uiState.rootProject,
+            onOpenFile = { file ->
+                viewModel.openFile(file)
+                viewModel.selectNavTab(MainNavTab.EDITOR)
+            },
+            actions = actions,
+            onDismiss = { viewModel.toggleCommandPalette(false) }
+        )
+    }
+
+    if (showTemplatesDialog) {
+        AlertDialog(
+            onDismissRequest = { showTemplatesDialog = false },
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Default.AutoAwesomeMotion, contentDescription = null, tint = Color(0xFFFBBF24), modifier = Modifier.size(22.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text("Plantillas de Proyecto", color = Color.White, fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                }
+            },
+            text = {
+                Column(
+                    modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        "Selecciona una plantilla para inicializar un proyecto estructurado listo para compilar y desplegar:",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp
+                    )
+
+                    uiState.projectTemplates.forEach { template ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .border(1.dp, Color(0xFF222436), RoundedCornerShape(10.dp)),
+                            shape = RoundedCornerShape(10.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xFF13141F))
+                        ) {
+                            Column(modifier = Modifier.fillMaxWidth().padding(12.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(template.title, color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                    Button(
+                                        onClick = {
+                                            viewModel.loadProjectTemplate(template)
+                                            showTemplatesDialog = false
+                                            coroutineScope.launch {
+                                                snackbarHostState.showSnackbar("Proyecto '${template.title}' inicializado")
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF)),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text("Crear", fontSize = 11.sp, color = Color.White)
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(template.description, color = Color(0xFF94A3B8), fontSize = 11.sp)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    template.tags.forEach { tag ->
+                                        Box(
+                                            modifier = Modifier
+                                                .background(Color(0xFF1E2030), RoundedCornerShape(4.dp))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(tag, color = Color(0xFF38BDF8), fontSize = 9.sp)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showTemplatesDialog = false }) {
+                    Text("Cerrar", color = Color(0xFF94A3B8))
+                }
+            },
+            containerColor = Color(0xFF0F101A)
+        )
+    }
 }
 
 /**
@@ -538,6 +744,9 @@ private fun IdeTopAppBar(
     onMoreClick: () -> Unit,
     showMenuOptions: Boolean,
     onDismissMenu: () -> Unit,
+    onOpenCommandPalette: () -> Unit = {},
+    onFormatCode: () -> Unit = {},
+    onOpenTemplates: () -> Unit = {},
     onSaveFile: () -> Unit,
     onNewFile: () -> Unit,
     onNewFolder: () -> Unit,
@@ -625,6 +834,17 @@ private fun IdeTopAppBar(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
+            // Command Center Button (Spotlight / Bolt)
+            Box(
+                modifier = Modifier
+                    .size(36.dp)
+                    .background(Color(0xFF1E2238), CircleShape)
+                    .clickable { onOpenCommandPalette() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(Icons.Default.Bolt, contentDescription = "Command Palette", tint = Color(0xFFFBBF24), modifier = Modifier.size(20.dp))
+            }
+
             // Play Button
             Box(
                 modifier = Modifier
@@ -647,6 +867,14 @@ private fun IdeTopAppBar(
                     onDismissRequest = onDismissMenu,
                     modifier = Modifier.background(Color(0xFF141522))
                 ) {
+                    DropdownMenuItem(
+                        text = { Text("✨ Formatear Código", color = Color(0xFFA78BFA)) },
+                        onClick = onFormatCode
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📦 Proyecto desde Plantilla...", color = Color(0xFF38BDF8)) },
+                        onClick = onOpenTemplates
+                    )
                     DropdownMenuItem(
                         text = { Text("💾 Guardar archivo", color = Color.White) },
                         onClick = onSaveFile

@@ -29,7 +29,8 @@ fun FilesScreen(
     onNewFileClick: () -> Unit,
     onNewFolderClick: () -> Unit = {},
     onRefreshClick: () -> Unit = {},
-    onDeleteFile: (ProjectFile) -> Unit = {}
+    onDeleteFile: (ProjectFile) -> Unit = {},
+    onTemplatesClick: () -> Unit = {}
 ) {
     val scrollState = rememberScrollState()
 
@@ -60,6 +61,14 @@ fun FilesScreen(
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                IconButton(onClick = onTemplatesClick, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        imageVector = Icons.Default.AutoAwesomeMotion,
+                        contentDescription = "Plantillas de proyecto",
+                        tint = Color(0xFFFBBF24),
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
                 IconButton(onClick = onNewFileClick, modifier = Modifier.size(32.dp)) {
                     Icon(
                         imageVector = Icons.Default.NoteAdd,
