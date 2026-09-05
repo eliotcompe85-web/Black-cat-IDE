@@ -196,17 +196,25 @@ fun IdeMainScreen(
                             activeAgent = uiState.activeAgent,
                             availableAgents = uiState.availableAgents,
                             onSelectAgent = { agent -> viewModel.selectLocalAgent(agent) },
-                            aiResponse = uiState.aiResponse,
-                            isAiLoading = uiState.isAiLoading,
-                            onActionClick = { actionId ->
-                                when (actionId) {
-                                    "EXPLAIN" -> viewModel.askAiAssistant("Explica detalladamente la estructura y componentes de este código")
-                                    "GENERATE" -> viewModel.askAiAssistant("Genera un widget o componente Flutter reutilizable en Dart para este archivo")
-                                    "FIND_BUGS" -> viewModel.askAiAssistant("Revisa el código en busca de posibles fallos o advertencias de sintaxis")
-                                    "REFACTOR" -> viewModel.askAiAssistant("Refactoriza y optimiza esta función para mejorar rendimiento y legibilidad")
-                                }
+                            downloadableAgents = uiState.downloadableAgents,
+                            onDownloadAndActivateAgent = { agent ->
+                                viewModel.downloadAndActivateAgent(agent)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Agente ${agent.name} descargado y activado") }
                             },
+                            chatMessages = uiState.chatMessages,
+                            currentExecutionStep = uiState.currentExecutionStep,
+                            isAiLoading = uiState.isAiLoading,
                             onSendMessage = { prompt -> viewModel.askAiAssistant(prompt) },
+                            onExecuteAction = { action ->
+                                viewModel.executeAgentAction(action)
+                            },
+                            onViewInTerminal = { action ->
+                                viewModel.selectNavTab(MainNavTab.TERMINAL)
+                            },
+                            onRejectAction = { action ->
+                                viewModel.rejectAgentAction(action)
+                            },
+                            onClearChat = { viewModel.clearChatHistory() },
                             onInsertCode = { code ->
                                 viewModel.insertAiCodeIntoEditor(code)
                                 viewModel.selectNavTab(MainNavTab.EDITOR)

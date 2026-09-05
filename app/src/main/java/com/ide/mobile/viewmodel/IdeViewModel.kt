@@ -4,16 +4,22 @@ import androidx.compose.ui.text.TextRange
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.ide.mobile.core.model.ActionStatus
+import com.ide.mobile.core.model.AgentAction
+import com.ide.mobile.core.model.AgentActionType
 import com.ide.mobile.core.model.AnalysisRequest
 import com.ide.mobile.core.model.AnalysisResponse
 import com.ide.mobile.core.model.AnalysisStatus
 import com.ide.mobile.core.model.ApiKeysConfig
 import com.ide.mobile.core.model.BuildProgress
 import com.ide.mobile.core.model.BuildStep
+import com.ide.mobile.core.model.ChatMessage
 import com.ide.mobile.core.model.DiagnosticIssue
 import com.ide.mobile.core.model.DiagnosticsState
+import com.ide.mobile.core.model.DownloadableAgent
 import com.ide.mobile.core.model.LanguageType
 import com.ide.mobile.core.model.LocalAgentEntity
+import com.ide.mobile.core.model.MessageSender
 import com.ide.mobile.core.model.ModelItem
 import com.ide.mobile.core.model.ProjectFile
 import com.ide.mobile.core.model.QuickFix
@@ -22,6 +28,7 @@ import com.ide.mobile.core.model.RagDocument
 import com.ide.mobile.core.model.RouterConfig
 import com.ide.mobile.core.model.RuntimeMetrics
 import com.ide.mobile.core.model.Severity
+import com.ide.mobile.feature.ai.AgentActionParser
 import com.ide.mobile.feature.ai.AiAssistantManager
 import com.ide.mobile.feature.ai.CodeContext
 import com.ide.mobile.feature.ai.LocalAgentEngine
@@ -92,6 +99,11 @@ data class IdeUiState(
     val localAiTestStatus: String? = null,
     val aiResponse: String? = null,
     val isAiLoading: Boolean = false,
+    val chatMessages: List<ChatMessage> = emptyList(),
+    val currentExecutionStep: String? = null,
+    val isAgentExecuting: Boolean = false,
+    val downloadableAgents: List<DownloadableAgent> = emptyList(),
+    val autoExecuteAgentActions: Boolean = false,
     val consoleLogs: List<String> = emptyList(),
     val installedModels: List<ModelItem> = emptyList(),
     val catalogModels: List<ModelItem> = emptyList(),
@@ -135,6 +147,7 @@ class IdeViewModel : ViewModel() {
             diagnosticsState = DiagnosticsState(documentVersion = 1L),
             availableAgents = aiManager.agentEngine.getAllAgents(),
             activeAgent = aiManager.agentEngine.getAllAgents().first(),
+            downloadableAgents = aiManager.getDownloadableAgents(),
             consoleLogs = listOf(
                 "[BLACK CAT IDE v1.0 • KERNEL READY]",
                 "[⭐ CREATED BY J.COMPE]",
@@ -632,14 +645,30 @@ class IdeViewModel : ViewModel() {
         }
     }
 
-    fun sendAiPrompt(prompt: String) {
-        if (prompt.isBlank()) return
+    fun askAiAssistant(prompt: String) {
+        val cleanPrompt = prompt.trim()
+        if (cleanPrompt.isBlank()) return
         activeAiJob?.cancel()
 
+        val activeAgent = _uiState.value.activeAgent
+        val userMsg = ChatMessage(
+            sender = MessageSender.USER,
+            text = cleanPrompt
+        )
+        val initialAgentMsg = ChatMessage(
+            sender = MessageSender.AGENT,
+            agentName = activeAgent.name,
+            agentIcon = activeAgent.icon,
+            text = "",
+            isStreaming = true
+        )
+
+        val updatedMessages = _uiState.value.chatMessages + listOf(userMsg, initialAgentMsg)
         _uiState.update {
             it.copy(
+                chatMessages = updatedMessages,
                 isAiLoading = true,
-                aiResponse = ""
+                currentExecutionStep = "Analizando requerimientos y código..."
             )
         }
 
@@ -652,26 +681,144 @@ class IdeViewModel : ViewModel() {
             )
 
             val buffer = StringBuilder()
-            aiManager.generateCompletionStream(prompt, codeCtx).collect { chunk ->
+            aiManager.generateCompletionStream(cleanPrompt, codeCtx).collect { chunk ->
                 buffer.append(chunk)
-                _uiState.update { it.copy(aiResponse = buffer.toString()) }
+                val currentText = buffer.toString()
+                _uiState.update { state ->
+                    val msgs = state.chatMessages.toMutableList()
+                    val lastIdx = msgs.indexOfLast { m -> m.id == initialAgentMsg.id }
+                    if (lastIdx != -1) {
+                        msgs[lastIdx] = msgs[lastIdx].copy(text = currentText)
+                    }
+                    state.copy(chatMessages = msgs, aiResponse = currentText)
+                }
             }
 
-            _uiState.update { it.copy(isAiLoading = false) }
+            val finalResponse = buffer.toString()
+            val parsedActions = AgentActionParser.parseActions(finalResponse)
+
+            _uiState.update { state ->
+                val msgs = state.chatMessages.toMutableList()
+                val lastIdx = msgs.indexOfLast { m -> m.id == initialAgentMsg.id }
+                if (lastIdx != -1) {
+                    msgs[lastIdx] = msgs[lastIdx].copy(
+                        text = finalResponse,
+                        actions = parsedActions,
+                        isStreaming = false
+                    )
+                }
+                state.copy(
+                    chatMessages = msgs,
+                    isAiLoading = false,
+                    currentExecutionStep = if (parsedActions.isNotEmpty()) "Acciones propuestas listas para revisar" else null
+                )
+            }
+        }
+    }
+
+    fun executeAgentAction(action: AgentAction) {
+        viewModelScope.launch {
+            updateActionStatus(action.id, ActionStatus.RUNNING, null)
+            _uiState.update { it.copy(currentExecutionStep = "Ejecutando: ${action.title}...") }
+
+            var outputText = ""
+
+            when (action.type) {
+                AgentActionType.RUN_COMMAND, AgentActionType.INSTALL_DEPENDENCY -> {
+                    executeTerminalCommand(action.payload)
+                    outputText = "✓ Comando '${action.payload}' ejecutado en la terminal interactiva."
+                }
+                AgentActionType.CREATE_FOLDER -> {
+                    val folderName = action.targetPath ?: action.payload
+                    createNewFolder(folderName)
+                    outputText = "✓ Carpeta '$folderName' creada con éxito."
+                }
+                AgentActionType.CREATE_FILE -> {
+                    val fileName = action.targetPath ?: "nuevo_componente.dart"
+                    createNewFile(fileName)
+                    _uiState.value.activeFile.content = action.payload
+                    onEditorChange(TextFieldValue(action.payload), isImmediate = true)
+                    outputText = "✓ Archivo '$fileName' creado y abierto en el editor."
+                }
+                AgentActionType.MODIFY_FILE -> {
+                    _uiState.value.activeFile.content = action.payload
+                    onEditorChange(TextFieldValue(action.payload), isImmediate = true)
+                    outputText = "✓ Código actualizado en '${_uiState.value.activeFile.name}'."
+                }
+                AgentActionType.HTTP_REQUEST -> {
+                    outputText = aiManager.executeHttpRequest(action.payload)
+                }
+            }
+
+            delay(250)
+            updateActionStatus(action.id, ActionStatus.SUCCESS, outputText)
+            _uiState.update {
+                it.copy(
+                    currentExecutionStep = null,
+                    consoleLogs = it.consoleLogs + listOf("[Antigravity] Acción completada: ${action.title}")
+                )
+            }
+        }
+    }
+
+    fun rejectAgentAction(action: AgentAction) {
+        updateActionStatus(action.id, ActionStatus.REJECTED, "Descartado por el usuario.")
+    }
+
+    private fun updateActionStatus(actionId: String, status: ActionStatus, output: String?) {
+        _uiState.update { state ->
+            val updatedMessages = state.chatMessages.map { msg ->
+                val updatedActions = msg.actions.map { act ->
+                    if (act.id == actionId) act.copy(status = status, output = output ?: act.output) else act
+                }
+                msg.copy(actions = updatedActions)
+            }
+            state.copy(chatMessages = updatedMessages)
+        }
+    }
+
+    fun downloadAndActivateAgent(downloadable: DownloadableAgent) {
+        viewModelScope.launch {
+            _uiState.update { it.copy(currentExecutionStep = "Descargando y activando agente ${downloadable.name}...") }
+            val activated = aiManager.downloadAndActivateAgent(downloadable, null)
+            val allAgents = aiManager.agentEngine.getAllAgents()
+            val downloadables = aiManager.getDownloadableAgents()
+
+            val welcomeMsg = ChatMessage(
+                sender = MessageSender.AGENT,
+                agentName = activated.name,
+                agentIcon = activated.icon,
+                text = "✅ **${activated.name}** descargado y activado en el dispositivo.\n\n" +
+                        "• **Especialidad:** ${downloadable.category}\n" +
+                        "• **Habilidades:** ${downloadable.skills.joinToString(", ") { "`$it`" }}\n\n" +
+                        "Estoy listo para asistirte en desarrollo móvil, crear carpetas, instalar librerías o ejecutar comandos."
+            )
+
+            _uiState.update {
+                it.copy(
+                    activeAgent = activated,
+                    selectedAiProvider = ProviderType.LOCAL_AGENT,
+                    availableAgents = allAgents,
+                    downloadableAgents = downloadables,
+                    chatMessages = it.chatMessages + listOf(welcomeMsg),
+                    currentExecutionStep = null,
+                    consoleLogs = it.consoleLogs + listOf("[Antigravity] Agente descargado y activado: ${activated.name}")
+                )
+            }
         }
     }
 
     fun runProject() {
         executeTerminalCommand("flutter run")
-        _uiState.update { it.copy(showTerminal = true) }
+        _uiState.update { it.copy(showTerminal = true, currentNavTab = MainNavTab.TERMINAL) }
     }
 
-    fun askAiAssistant(prompt: String) {
-        sendAiPrompt(prompt)
+    fun clearChatHistory() {
+        _uiState.update { it.copy(chatMessages = emptyList(), aiResponse = null, currentExecutionStep = null) }
     }
 
-    fun dismissAiAssistant() {
-        _uiState.update { it.copy(aiResponse = null, isAiLoading = false) }
+    fun sendAiPrompt(prompt: String) {
+        askAiAssistant(prompt)
     }
 
     fun insertAiGeneratedCode() {

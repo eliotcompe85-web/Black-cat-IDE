@@ -6,11 +6,13 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.*
@@ -22,23 +24,16 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalClipboardManager
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.ide.mobile.core.model.LocalAgentEntity
+import androidx.compose.ui.window.Dialog
+import com.ide.mobile.core.model.*
 import com.ide.mobile.feature.ai.ProviderType
-
-data class AiActionItem(
-    val id: String,
-    val icon: ImageVector,
-    val iconTint: Color,
-    val iconBg: Color,
-    val title: String,
-    val description: String
-)
 
 @Composable
 fun AiAssistantPanel(
@@ -47,156 +42,190 @@ fun AiAssistantPanel(
     activeAgent: LocalAgentEntity? = null,
     availableAgents: List<LocalAgentEntity> = emptyList(),
     onSelectAgent: (LocalAgentEntity) -> Unit = {},
-    aiResponse: String? = null,
+    downloadableAgents: List<DownloadableAgent> = emptyList(),
+    onDownloadAndActivateAgent: (DownloadableAgent) -> Unit = {},
+    chatMessages: List<ChatMessage> = emptyList(),
+    currentExecutionStep: String? = null,
     isAiLoading: Boolean = false,
-    onActionClick: (String) -> Unit = {},
     onSendMessage: (String) -> Unit = {},
+    onExecuteAction: (AgentAction) -> Unit = {},
+    onViewInTerminal: (AgentAction) -> Unit = {},
+    onRejectAction: (AgentAction) -> Unit = {},
+    onClearChat: () -> Unit = {},
     onInsertCode: (String) -> Unit = {},
     onClose: () -> Unit = {},
-    onOpenHubPage: (String) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var promptText by remember { mutableStateOf("") }
-    val scrollState = rememberScrollState()
+    var showDownloadCatalog by remember { mutableStateOf(false) }
+    val listState = rememberLazyListState()
+    val clipboardManager = LocalClipboardManager.current
 
-    val actions = listOf(
-        AiActionItem("EXPLAIN", Icons.Default.Code, Color(0xFFC084FC), Color(0xFF26193E), "Explicar código", "Analiza el archivo activo"),
-        AiActionItem("GENERATE", Icons.Default.AutoFixHigh, Color(0xFF34D399), Color(0xFF143026), "Generar código", "Crea widgets o lógica"),
-        AiActionItem("FIND_BUGS", Icons.Default.BugReport, Color(0xFF38BDF8), Color(0xFF132B3E), "Auditar fallas", "Encuentra posibles bugs"),
-        AiActionItem("REFACTOR", Icons.Default.Refresh, Color(0xFFFBBF24), Color(0xFF362B15), "Refactorizar", "Mejora calidad y modularidad")
-    )
+    // Auto-scroll al último mensaje
+    LaunchedEffect(chatMessages.size, isAiLoading) {
+        if (chatMessages.isNotEmpty()) {
+            listState.animateScrollToItem(chatMessages.size - 1)
+        }
+    }
 
     Column(
         modifier = modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            .background(Color(0xFF0F111A))
-            .border(1.dp, Color(0xFF2E324E), RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp))
-            .padding(16.dp)
+            .fillMaxSize()
+            .background(Color(0xFF0C0D15))
     ) {
-        // Drag Handle
-        Box(
-            modifier = Modifier
-                .align(Alignment.CenterHorizontally)
-                .width(40.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color(0xFF4A4D68))
-        )
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Header
-        Row(
+        // 1. Barra de Encabezado Superior
+        Surface(
+            color = Color(0xFF141522),
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+            border = BorderStroke(1.dp, Color(0xFF24263A))
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "✨ Antigravity AI Engine",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Box(
-                    modifier = Modifier
-                        .background(Color(0xFF1E1638), RoundedCornerShape(4.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = selectedProvider.badge,
-                        color = Color(0xFFC084FC),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                }
-            }
-
-            IconButton(onClick = onClose, modifier = Modifier.size(28.dp)) {
-                Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = Color(0xFF94A3B8), modifier = Modifier.size(18.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Provider Selector Horizontal Carousel (Intuitive, non-redundant)
-        val providerList = listOf(
-            ProviderType.LOCAL_AGENT to "🤖 Agentes Antigravity",
-            ProviderType.GEMINI_API to "⚡ Gemini AI",
-            ProviderType.OPENAI_API to "🧠 ChatGPT (GPT-4o)",
-            ProviderType.CLAUDE_API to "🎭 Claude (3.5)",
-            ProviderType.PERPLEXITY_API to "🔍 Perplexity",
-            ProviderType.LOCAL_GGUF to "📱 Local LM"
-        )
-
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
-        ) {
-            providerList.forEach { (type, label) ->
-                val isSelected = selectedProvider == type
-                Surface(
-                    color = if (isSelected) Color(0xFF7B61FF).copy(alpha = 0.25f) else Color(0xFF141522),
-                    shape = RoundedCornerShape(14.dp),
-                    border = BorderStroke(1.dp, if (isSelected) Color(0xFF7B61FF) else Color(0xFF24263A)),
-                    modifier = Modifier.clickable { onSelectProvider(type) }
-                ) {
-                    Text(
-                        text = label,
-                        fontSize = 10.sp,
-                        color = if (isSelected) Color.White else Color(0xFF94A3B8),
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
-                        modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp)
-                    )
-                }
-            }
-        }
-
-        // When Local Agent is active: show active agent banner & agent selector
-        if (selectedProvider == ProviderType.LOCAL_AGENT && activeAgent != null) {
-            Spacer(modifier = Modifier.height(8.dp))
-            Surface(
-                color = Color(0xFF141522),
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, Color(0xFF7B61FF).copy(alpha = 0.4f)),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(activeAgent.icon, fontSize = 18.sp)
+                        Text(
+                            text = "✨ Antigravity Agent Studio",
+                            fontSize = 14.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(activeAgent.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                            Text(activeAgent.description, color = Color(0xFF94A3B8), fontSize = 10.sp, maxLines = 1)
+                        Surface(
+                            color = Color(0xFF7B61FF).copy(alpha = 0.2f),
+                            shape = RoundedCornerShape(4.dp),
+                            border = BorderStroke(0.5.dp, Color(0xFF7B61FF))
+                        ) {
+                            Text(
+                                text = selectedProvider.badge,
+                                color = Color(0xFFC084FC),
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold,
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                            )
                         }
                     }
 
-                    // Agent selector chips
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        IconButton(
+                            onClick = { showDownloadCatalog = true },
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Download,
+                                contentDescription = "Descargar Agentes",
+                                tint = Color(0xFF38BDF8),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onClearChat,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.DeleteSweep,
+                                contentDescription = "Limpiar Chat",
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+
+                        IconButton(
+                            onClick = onClose,
+                            modifier = Modifier.size(30.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Close,
+                                contentDescription = "Cerrar",
+                                tint = Color(0xFF94A3B8),
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Selector Horizontal de Proveedores de IA
+                val providerList = listOf(
+                    ProviderType.LOCAL_AGENT to "🤖 Agentes Antigravity",
+                    ProviderType.GEMINI_API to "⚡ Gemini Free",
+                    ProviderType.OPENAI_API to "🧠 ChatGPT (4o)",
+                    ProviderType.CLAUDE_API to "🎭 Claude (3.5)",
+                    ProviderType.PERPLEXITY_API to "🔍 Perplexity",
+                    ProviderType.LOCAL_GGUF to "📱 Local LM"
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    providerList.forEach { (type, label) ->
+                        val isSelected = selectedProvider == type
+                        Surface(
+                            color = if (isSelected) Color(0xFF7B61FF).copy(alpha = 0.25f) else Color(0xFF1B1D2D),
+                            shape = RoundedCornerShape(12.dp),
+                            border = BorderStroke(1.dp, if (isSelected) Color(0xFF7B61FF) else Color(0xFF26283C)),
+                            modifier = Modifier.clickable { onSelectProvider(type) }
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 10.sp,
+                                color = if (isSelected) Color.White else Color(0xFF94A3B8),
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                modifier = Modifier.padding(horizontal = 9.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+                }
+
+                // Chips de selección de agente si el proveedor es LOCAL_AGENT
+                if (selectedProvider == ProviderType.LOCAL_AGENT && availableAgents.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(6.dp))
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
                             .horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         availableAgents.forEach { agent ->
-                            val isAgentActive = agent.id == activeAgent.id
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isAgentActive) Color(0xFF7B61FF) else Color(0xFF1E2135))
-                                    .clickable { onSelectAgent(agent) }
-                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            val isAgentActive = agent.id == activeAgent?.id
+                            Surface(
+                                color = if (isAgentActive) Color(0xFF7B61FF) else Color(0xFF1A1C2C),
+                                shape = RoundedCornerShape(8.dp),
+                                border = BorderStroke(0.8.dp, if (isAgentActive) Color(0xFFA78BFA) else Color(0xFF26283C)),
+                                modifier = Modifier.clickable { onSelectAgent(agent) }
                             ) {
                                 Text(
                                     text = "${agent.icon} ${agent.name}",
-                                    color = if (isAgentActive) Color.White else Color(0xFFC084FC),
+                                    color = Color.White,
                                     fontSize = 10.sp,
-                                    fontWeight = if (isAgentActive) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isAgentActive) FontWeight.Bold else FontWeight.Normal,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                 )
+                            }
+                        }
+
+                        // Botón de acceso rápido a descarga de agentes
+                        Surface(
+                            color = Color(0xFF102A36),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.8.dp, Color(0xFF38BDF8).copy(alpha = 0.5f)),
+                            modifier = Modifier.clickable { showDownloadCatalog = true }
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(Icons.Default.Add, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
+                                Spacer(modifier = Modifier.width(3.dp))
+                                Text("Descargar Agente", color = Color(0xFF38BDF8), fontSize = 10.sp, fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -204,89 +233,557 @@ fun AiAssistantPanel(
             }
         }
 
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Action Quick Chips (Clean 4 Actions)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            actions.forEach { action ->
-                Surface(
-                    color = action.iconBg,
-                    shape = RoundedCornerShape(8.dp),
-                    border = BorderStroke(0.8.dp, action.iconTint.copy(alpha = 0.3f)),
-                    modifier = Modifier.clickable { onActionClick(action.id) }
+        // 2. Banner de Ejecución en Vivo ("Muestra lo que está ejecutando")
+        if (currentExecutionStep != null || isAiLoading) {
+            Surface(
+                color = Color(0xFF1A1733),
+                modifier = Modifier.fillMaxWidth(),
+                border = BorderStroke(1.dp, Color(0xFF7B61FF).copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(action.icon, contentDescription = null, tint = action.iconTint, modifier = Modifier.size(14.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(action.title, color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Medium)
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(13.dp),
+                        color = Color(0xFF38BDF8),
+                        strokeWidth = 2.dp
+                    )
+                    Spacer(modifier = Modifier.width(9.dp))
+                    Text(
+                        text = currentExecutionStep ?: "Procesando respuesta en vivo...",
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium
+                    )
+                }
+            }
+        }
+
+        // 3. Conversación Fluida (Historial de Mensajes)
+        Box(modifier = Modifier.weight(1f)) {
+            if (chatMessages.isEmpty()) {
+                // Pantalla de Bienvenida y Sugerencias de Herramientas
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.Center,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text(
+                        text = activeAgent?.icon ?: "🐱",
+                        fontSize = 42.sp
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = activeAgent?.name ?: "Black Cat Antigravity Copilot",
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = activeAgent?.description ?: "Listo para crear carpetas, instalar paquetes y compilar.",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+                    Text(
+                        text = "Sugerencias de inicio rápido:",
+                        color = Color(0xFFC084FC),
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    val quickPrompts = listOf(
+                        "📁 Crea la carpeta components y un archivo custom_card.dart",
+                        "📦 Instala el paquete http y genera una solicitud GET",
+                        "🖥️ Ejecuta git status y revisa los archivos modificados",
+                        "🪄 Genera un widget Flutter con animación a 60 FPS",
+                        "🪲 Audita el código activo en busca de fallas o balance de llaves"
+                    )
+
+                    quickPrompts.forEach { prompt ->
+                        Surface(
+                            color = Color(0xFF141522),
+                            shape = RoundedCornerShape(8.dp),
+                            border = BorderStroke(0.8.dp, Color(0xFF24263A)),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 3.dp)
+                                .clickable { onSendMessage(prompt) }
+                        ) {
+                            Text(
+                                text = prompt,
+                                color = Color(0xFFCBD5E1),
+                                fontSize = 11.sp,
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
+                            )
+                        }
+                    }
+                }
+            } else {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 12.dp, vertical = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(chatMessages, key = { it.id }) { message ->
+                        ChatMessageItem(
+                            message = message,
+                            onExecuteAction = onExecuteAction,
+                            onViewInTerminal = onViewInTerminal,
+                            onRejectAction = onRejectAction,
+                            onInsertCode = onInsertCode,
+                            onCopyText = { text ->
+                                clipboardManager.setText(AnnotatedString(text))
+                            }
+                        )
                     }
                 }
             }
         }
 
-        // Response or Loading Display
-        if (isAiLoading || !aiResponse.isNullOrBlank()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Surface(
-                color = Color(0xFF141522),
-                shape = RoundedCornerShape(10.dp),
-                border = BorderStroke(1.dp, Color(0xFF26283C)),
+        // 4. Barra de Entrada y Envío
+        Surface(
+            color = Color(0xFF141522),
+            modifier = Modifier.fillMaxWidth(),
+            border = BorderStroke(1.dp, Color(0xFF24263A))
+        ) {
+            Row(
                 modifier = Modifier
+                    .padding(8.dp)
                     .fillMaxWidth()
-                    .heightIn(max = 240.dp)
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color(0xFF0C0D15))
+                    .border(1.dp, Color(0xFF2E324E), RoundedCornerShape(20.dp))
+                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Column(
-                    modifier = Modifier
-                        .padding(12.dp)
-                        .verticalScroll(scrollState),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    if (isAiLoading) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            CircularProgressIndicator(
-                                color = Color(0xFF7B61FF),
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp
+                BasicTextField(
+                    value = promptText,
+                    onValueChange = { promptText = it },
+                    modifier = Modifier.weight(1f),
+                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
+                    cursorBrush = SolidColor(Color(0xFF7B61FF)),
+                    decorationBox = { innerTextField ->
+                        if (promptText.isEmpty()) {
+                            Text(
+                                text = "Pídele al agente que cree carpetas, instale paquetes o ejecute comandos...",
+                                color = Color(0xFF64748B),
+                                fontSize = 11.sp
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text("Generando respuesta en streaming...", color = Color(0xFFC084FC), fontSize = 11.sp)
+                        }
+                        innerTextField()
+                    }
+                )
+
+                IconButton(
+                    onClick = {
+                        if (promptText.isNotBlank()) {
+                            onSendMessage(promptText)
+                            promptText = ""
+                        }
+                    },
+                    modifier = Modifier
+                        .size(32.dp)
+                        .clip(CircleShape)
+                        .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF38BDF8))))
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Send,
+                        contentDescription = "Enviar",
+                        tint = Color.White,
+                        modifier = Modifier.size(15.dp)
+                    )
+                }
+            }
+        }
+    }
+
+    // Modal de Catálogo de Descarga de Agentes
+    if (showDownloadCatalog) {
+        DownloadAgentsDialog(
+            agents = downloadableAgents,
+            activeAgentId = activeAgent?.id,
+            onDownloadAndActivate = { agent ->
+                onDownloadAndActivateAgent(agent)
+                showDownloadCatalog = false
+            },
+            onDismiss = { showDownloadCatalog = false }
+        )
+    }
+}
+
+/**
+ * Renderizador de mensaje individual con burbuja, bloques de código y tarjetas de terminal ejecutables.
+ */
+@Composable
+fun ChatMessageItem(
+    message: ChatMessage,
+    onExecuteAction: (AgentAction) -> Unit,
+    onViewInTerminal: (AgentAction) -> Unit,
+    onRejectAction: (AgentAction) -> Unit,
+    onInsertCode: (String) -> Unit,
+    onCopyText: (String) -> Unit
+) {
+    val isUser = message.sender == MessageSender.USER
+
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalAlignment = if (isUser) Alignment.End else Alignment.Start
+    ) {
+        // Cabecera del Mensaje
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.padding(bottom = 2.dp)
+        ) {
+            Text(
+                text = if (isUser) "Tú" else "${message.agentIcon ?: "🤖"} ${message.agentName ?: "Agente Antigravity"}",
+                color = if (isUser) Color(0xFFA78BFA) else Color(0xFF38BDF8),
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold
+            )
+        }
+
+        // Burbuja del Mensaje
+        Surface(
+            color = if (isUser) Color(0xFF261D47) else Color(0xFF141522),
+            shape = RoundedCornerShape(
+                topStart = 12.dp,
+                topEnd = 12.dp,
+                bottomStart = if (isUser) 12.dp else 2.dp,
+                bottomEnd = if (isUser) 2.dp else 12.dp
+            ),
+            border = BorderStroke(0.8.dp, if (isUser) Color(0xFF7B61FF).copy(alpha = 0.4f) else Color(0xFF24263A)),
+            modifier = Modifier.widthIn(max = 340.dp)
+        ) {
+            Column(modifier = Modifier.padding(10.dp)) {
+                Text(
+                    text = message.text,
+                    color = Color(0xFFE2E8F0),
+                    fontSize = 12.sp,
+                    lineHeight = 17.sp
+                )
+
+                // Si el mensaje contiene bloques de código, mostrar acciones de código
+                if (!isUser && message.text.contains("```")) {
+                    val codeBlocks = extractCodeBlocks(message.text)
+                    codeBlocks.forEach { code ->
+                        Spacer(modifier = Modifier.height(6.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            OutlinedButton(
+                                onClick = { onCopyText(code) },
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(26.dp),
+                                border = BorderStroke(0.8.dp, Color(0xFF64748B))
+                            ) {
+                                Icon(Icons.Default.ContentCopy, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Copiar", color = Color.White, fontSize = 10.sp)
+                            }
+
+                            Button(
+                                onClick = { onInsertCode(code) },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF)),
+                                shape = RoundedCornerShape(6.dp),
+                                contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                modifier = Modifier.height(26.dp)
+                            ) {
+                                Icon(Icons.Default.Code, contentDescription = null, tint = Color.White, modifier = Modifier.size(11.dp))
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Text("Insertar en Editor", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                            }
                         }
                     }
+                }
 
-                    if (!aiResponse.isNullOrBlank()) {
-                        Text(
-                            text = aiResponse,
-                            color = Color(0xFFE2E8F0),
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp,
-                            fontFamily = FontFamily.Default
+                // Tarjetas Interactivas de Acción de Terminal / Archivos / Paquetes
+                if (message.actions.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "⚡ Herramientas y Acciones Propuestas:",
+                        color = Color(0xFF38BDF8),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+
+                    message.actions.forEach { action ->
+                        AgentActionCard(
+                            action = action,
+                            onExecute = { onExecuteAction(action) },
+                            onViewTerminal = { onViewInTerminal(action) },
+                            onReject = { onRejectAction(action) }
                         )
+                        Spacer(modifier = Modifier.height(4.dp))
+                    }
+                }
+            }
+        }
+    }
+}
 
-                        // If response contains code block, show Insert Button
-                        if (aiResponse.contains("```")) {
-                            val extractedCode = aiResponse.substringAfter("```")
-                                .substringAfter("\n")
-                                .substringBefore("```")
+/**
+ * Tarjeta interactiva para la terminal y herramientas que el usuario puede revisar y aprobar.
+ */
+@Composable
+fun AgentActionCard(
+    action: AgentAction,
+    onExecute: () -> Unit,
+    onViewTerminal: () -> Unit,
+    onReject: () -> Unit
+) {
+    val icon = when (action.type) {
+        AgentActionType.RUN_COMMAND -> Icons.Default.Terminal
+        AgentActionType.INSTALL_DEPENDENCY -> Icons.Default.Extension
+        AgentActionType.CREATE_FOLDER -> Icons.Default.Folder
+        AgentActionType.CREATE_FILE -> Icons.Default.Code
+        AgentActionType.MODIFY_FILE -> Icons.Default.Edit
+        AgentActionType.HTTP_REQUEST -> Icons.Default.Language
+    }
 
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Button(
-                                    onClick = { onInsertCode(extractedCode) },
-                                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF)),
-                                    shape = RoundedCornerShape(6.dp),
-                                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                                    modifier = Modifier.height(30.dp)
+    val accentColor = when (action.status) {
+        ActionStatus.PROPOSED -> Color(0xFF38BDF8)
+        ActionStatus.RUNNING -> Color(0xFFFBBF24)
+        ActionStatus.SUCCESS -> Color(0xFF34D399)
+        ActionStatus.FAILED -> Color(0xFFEF4444)
+        ActionStatus.REJECTED -> Color(0xFF64748B)
+    }
+
+    Surface(
+        color = Color(0xFF0C0D15),
+        shape = RoundedCornerShape(8.dp),
+        border = BorderStroke(0.8.dp, accentColor.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(modifier = Modifier.padding(8.dp)) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(icon, contentDescription = null, tint = accentColor, modifier = Modifier.size(14.dp))
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = action.title,
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Surface(
+                    color = accentColor.copy(alpha = 0.15f),
+                    shape = RoundedCornerShape(4.dp)
+                ) {
+                    Text(
+                        text = when (action.status) {
+                            ActionStatus.PROPOSED -> "Pendiente"
+                            ActionStatus.RUNNING -> "Ejecutando..."
+                            ActionStatus.SUCCESS -> "Completado ✓"
+                            ActionStatus.FAILED -> "Error ✗"
+                            ActionStatus.REJECTED -> "Descartado"
+                        },
+                        color = accentColor,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                    )
+                }
+            }
+
+            // Vista previa del comando / código
+            Spacer(modifier = Modifier.height(4.dp))
+            Surface(
+                color = Color(0xFF141522),
+                shape = RoundedCornerShape(4.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = action.payload.trim().take(120),
+                    color = Color(0xFFA5B4FC),
+                    fontSize = 10.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(6.dp)
+                )
+            }
+
+            // Salida de consola si ya se ejecutó
+            val outputText = action.output
+            if (!outputText.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = outputText,
+                    color = Color(0xFF94A3B8),
+                    fontSize = 9.sp,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier.padding(horizontal = 4.dp)
+                )
+            }
+
+            // Botones de Acción (Si está pendiente)
+            if (action.status == ActionStatus.PROPOSED) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Button(
+                        onClick = onExecute,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF34D399)),
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, tint = Color.Black, modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Aprobar y Ejecutar", color = Color.Black, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                    }
+
+                    OutlinedButton(
+                        onClick = onViewTerminal,
+                        shape = RoundedCornerShape(6.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                        modifier = Modifier.height(26.dp),
+                        border = BorderStroke(0.8.dp, Color(0xFF38BDF8))
+                    ) {
+                        Icon(Icons.Default.Terminal, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(12.dp))
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text("Ver en Terminal", color = Color(0xFF38BDF8), fontSize = 10.sp)
+                    }
+
+                    TextButton(
+                        onClick = onReject,
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 2.dp),
+                        modifier = Modifier.height(26.dp)
+                    ) {
+                        Text("Descartar", color = Color(0xFF64748B), fontSize = 10.sp)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Diálogo interactivo del catálogo para descargar y activar agentes en el teléfono.
+ */
+@Composable
+fun DownloadAgentsDialog(
+    agents: List<DownloadableAgent>,
+    activeAgentId: String?,
+    onDownloadAndActivate: (DownloadableAgent) -> Unit,
+    onDismiss: () -> Unit
+) {
+    Dialog(onDismissRequest = onDismiss) {
+        Surface(
+            color = Color(0xFF0F111A),
+            shape = RoundedCornerShape(16.dp),
+            border = BorderStroke(1.dp, Color(0xFF2E324E)),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            Column(modifier = Modifier.padding(16.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "📥 Catálogo de Agentes Antigravity",
+                        color = Color.White,
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(24.dp)) {
+                        Icon(Icons.Default.Close, contentDescription = null, tint = Color(0xFF94A3B8))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "Descarga agentes especializados y actívalos al instante para desarrollo móvil óptimo:",
+                    color = Color(0xFF94A3B8),
+                    fontSize = 11.sp
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+
+                LazyColumn(
+                    modifier = Modifier.heightIn(max = 360.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(agents, key = { it.id }) { agent ->
+                        val isCurrent = agent.id == activeAgentId
+                        Surface(
+                            color = Color(0xFF141522),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, if (isCurrent) Color(0xFF34D399) else Color(0xFF24263A)),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Icon(Icons.Default.Code, contentDescription = null, tint = Color.White, modifier = Modifier.size(12.dp))
-                                    Spacer(modifier = Modifier.width(4.dp))
-                                    Text("Insertar en Editor", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Text(agent.icon, fontSize = 20.sp)
+                                        Spacer(modifier = Modifier.width(8.dp))
+                                        Column {
+                                            Text(agent.name, color = Color.White, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            Text(agent.category, color = Color(0xFF38BDF8), fontSize = 9.sp)
+                                        }
+                                    }
+
+                                    Button(
+                                        onClick = { onDownloadAndActivate(agent) },
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = if (isCurrent) Color(0xFF1E3A2F) else Color(0xFF7B61FF)
+                                        ),
+                                        shape = RoundedCornerShape(6.dp),
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp),
+                                        modifier = Modifier.height(28.dp)
+                                    ) {
+                                        Text(
+                                            text = if (isCurrent) "✓ Activo" else "Descargar y Activar",
+                                            color = if (isCurrent) Color(0xFF34D399) else Color.White,
+                                            fontSize = 10.sp,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                    }
+                                }
+
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(agent.description, color = Color(0xFFCBD5E1), fontSize = 10.sp)
+
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    agent.skills.forEach { skill ->
+                                        Surface(
+                                            color = Color(0xFF1C1E30),
+                                            shape = RoundedCornerShape(4.dp)
+                                        ) {
+                                            Text(
+                                                text = skill,
+                                                color = Color(0xFFA5B4FC),
+                                                fontSize = 8.sp,
+                                                modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -294,62 +791,14 @@ fun AiAssistantPanel(
                 }
             }
         }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Bottom Input Row
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(44.dp)
-                .clip(RoundedCornerShape(22.dp))
-                .background(Color(0xFF141522))
-                .border(1.dp, Color(0xFF26283C), RoundedCornerShape(22.dp))
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            BasicTextField(
-                value = promptText,
-                onValueChange = { promptText = it },
-                modifier = Modifier.weight(1f),
-                textStyle = TextStyle(color = Color.White, fontSize = 13.sp),
-                cursorBrush = SolidColor(Color(0xFF7B61FF)),
-                singleLine = true,
-                decorationBox = { innerTextField ->
-                    if (promptText.isEmpty()) {
-                        val placeholder = when (selectedProvider) {
-                            ProviderType.LOCAL_AGENT -> "Pregúntale a ${activeAgent?.name ?: "Antigravity"}..."
-                            ProviderType.GEMINI_API -> "Consulta rápida a Gemini Flash..."
-                            ProviderType.OPENAI_API -> "Pregúntale a ChatGPT (GPT-4o)..."
-                            ProviderType.CLAUDE_API -> "Pregúntale a Claude 3.5 Sonnet..."
-                            ProviderType.PERPLEXITY_API -> "Búsqueda web con Perplexity Sonar..."
-                            else -> "Escribe tu consulta de código..."
-                        }
-                        Text(placeholder, color = Color(0xFF64748B), fontSize = 12.sp)
-                    }
-                    innerTextField()
-                }
-            )
-
-            IconButton(
-                onClick = {
-                    if (promptText.isNotBlank()) {
-                        onSendMessage(promptText)
-                        promptText = ""
-                    }
-                },
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF38BDF8))))
-            ) {
-                Icon(
-                    imageVector = Icons.AutoMirrored.Filled.Send,
-                    contentDescription = "Enviar",
-                    tint = Color.White,
-                    modifier = Modifier.size(16.dp)
-                )
-            }
-        }
     }
+}
+
+private fun extractCodeBlocks(text: String): List<String> {
+    val list = mutableListOf<String>()
+    val regex = Regex("```(?:[a-zA-Z0-9_-]+)?\\s*\\n([\\s\\S]*?)```")
+    for (match in regex.findAll(text)) {
+        list.add(match.groupValues[1].trim())
+    }
+    return list
 }
