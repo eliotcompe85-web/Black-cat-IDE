@@ -59,7 +59,49 @@ fun AiAssistantPanel(
     var promptText by remember { mutableStateOf("") }
     var showDownloadCatalog by remember { mutableStateOf(false) }
     val listState = rememberLazyListState()
-    val clipboardManager = LocalClipboardManager.current
+    var customAgents by remember { mutableStateOf(listOf<Agent>()) }
+
+    // Construir lista unificada de agentes (Locales y Cloud)
+    val allAntigravityAgents = remember(availableAgents, selectedProvider, activeAgent, customAgents) {
+        val list = mutableListOf<Agent>()
+        availableAgents.forEach { local ->
+            list.add(
+                LocalAgent(
+                    id = local.id,
+                    name = local.name,
+                    description = local.description,
+                    icon = local.icon,
+                    isAvailable = local.isBuiltIn || (local.storagePath != null),
+                    executablePath = "/data/local/tmp/agent_${local.id}",
+                    workingDirectory = "."
+                )
+            )
+        }
+        list.add(ApiAgent(id = "gemini-free", name = "Gemini Free Tier", endpoint = "https://generativelanguage.googleapis.com", modelName = "gemini-1.5-flash", icon = "⚡"))
+        list.add(ApiAgent(id = "chatgpt-4o", name = "ChatGPT (4o)", endpoint = "https://api.openai.com/v1", modelName = "gpt-4o", icon = "🧠"))
+        list.add(ApiAgent(id = "claude-35", name = "Claude (3.5 Sonnet)", endpoint = "https://api.anthropic.com/v1", modelName = "claude-3-5-sonnet", icon = "🎭"))
+        list.add(ApiAgent(id = "perplexity", name = "Perplexity Online", endpoint = "https://api.perplexity.ai", modelName = "sonar", icon = "🔍"))
+        list.add(LocalAgent(id = "local-gguf", name = "Local GGUF Runtime", executablePath = "llama-cli", workingDirectory = ".", icon = "📱"))
+        list.addAll(customAgents)
+        list
+    }
+
+    var selectedAgentState by remember(selectedProvider, activeAgent) {
+        mutableStateOf(
+            if (selectedProvider == ProviderType.LOCAL_AGENT && activeAgent != null) {
+                allAntigravityAgents.find { it.id == activeAgent.id } ?: allAntigravityAgents.first()
+            } else {
+                when (selectedProvider) {
+                    ProviderType.GEMINI_API -> allAntigravityAgents.find { it.id == "gemini-free" }
+                    ProviderType.OPENAI_API -> allAntigravityAgents.find { it.id == "chatgpt-4o" }
+                    ProviderType.CLAUDE_API -> allAntigravityAgents.find { it.id == "claude-35" }
+                    ProviderType.PERPLEXITY_API -> allAntigravityAgents.find { it.id == "perplexity" }
+                    ProviderType.LOCAL_GGUF -> allAntigravityAgents.find { it.id == "local-gguf" }
+                    else -> allAntigravityAgents.firstOrNull()
+                } ?: allAntigravityAgents.first()
+            }
+        )
+    }
 
     // Auto-scroll al último mensaje
     LaunchedEffect(chatMessages.size, isAiLoading) {
@@ -87,25 +129,40 @@ fun AiAssistantPanel(
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = "✨ Antigravity Agent Studio",
-                            fontSize = 14.sp,
+                            text = "✨ Antigravity Studio",
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color.White
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Surface(
-                            color = Color(0xFF7B61FF).copy(alpha = 0.2f),
-                            shape = RoundedCornerShape(4.dp),
-                            border = BorderStroke(0.5.dp, Color(0xFF7B61FF))
-                        ) {
-                            Text(
-                                text = selectedProvider.badge,
-                                color = Color(0xFFC084FC),
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold,
-                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
-                            )
-                        }
+                        // Selector de Agentes interactivo con dropdown
+                        AgentSelector(
+                            selectedAgent = selectedAgentState,
+                            availableAgents = allAntigravityAgents,
+                            onSelectAgent = { agent ->
+                                selectedAgentState = agent
+                                when (agent) {
+                                    is LocalAgent -> {
+                                        onSelectProvider(ProviderType.LOCAL_AGENT)
+                                        val matching = availableAgents.find { it.id == agent.id }
+                                        if (matching != null) onSelectAgent(matching)
+                                    }
+                                    is ApiAgent -> {
+                                        when (agent.id) {
+                                            "gemini-free" -> onSelectProvider(ProviderType.GEMINI_API)
+                                            "chatgpt-4o" -> onSelectProvider(ProviderType.OPENAI_API)
+                                            "claude-35" -> onSelectProvider(ProviderType.CLAUDE_API)
+                                            "perplexity" -> onSelectProvider(ProviderType.PERPLEXITY_API)
+                                            else -> onSelectProvider(ProviderType.GEMINI_API)
+                                        }
+                                    }
+                                }
+                            },
+                            onAddNewApiAgent = { newAgent ->
+                                customAgents = customAgents + newAgent
+                                selectedAgentState = newAgent
+                            }
+                        )
                     }
 
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -335,76 +392,28 @@ fun AiAssistantPanel(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     items(chatMessages, key = { it.id }) { message ->
-                        ChatMessageItem(
+                        ChatMessageBubble(
                             message = message,
-                            onExecuteAction = onExecuteAction,
-                            onViewInTerminal = onViewInTerminal,
+                            onApproveAction = onExecuteAction,
                             onRejectAction = onRejectAction,
-                            onInsertCode = onInsertCode,
-                            onCopyText = { text ->
-                                clipboardManager.setText(AnnotatedString(text))
-                            }
+                            onViewInTerminal = onViewInTerminal,
+                            onApplyCode = onInsertCode
                         )
                     }
                 }
             }
         }
 
-        // 4. Barra de Entrada y Envío
-        Surface(
-            color = Color(0xFF141522),
-            modifier = Modifier.fillMaxWidth(),
-            border = BorderStroke(1.dp, Color(0xFF24263A))
-        ) {
-            Row(
-                modifier = Modifier
-                    .padding(8.dp)
-                    .fillMaxWidth()
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color(0xFF0C0D15))
-                    .border(1.dp, Color(0xFF2E324E), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicTextField(
-                    value = promptText,
-                    onValueChange = { promptText = it },
-                    modifier = Modifier.weight(1f),
-                    textStyle = TextStyle(color = Color.White, fontSize = 12.sp),
-                    cursorBrush = SolidColor(Color(0xFF7B61FF)),
-                    decorationBox = { innerTextField ->
-                        if (promptText.isEmpty()) {
-                            Text(
-                                text = "Pídele al agente que cree carpetas, instale paquetes o ejecute comandos...",
-                                color = Color(0xFF64748B),
-                                fontSize = 11.sp
-                            )
-                        }
-                        innerTextField()
-                    }
-                )
-
-                IconButton(
-                    onClick = {
-                        if (promptText.isNotBlank()) {
-                            onSendMessage(promptText)
-                            promptText = ""
-                        }
-                    },
-                    modifier = Modifier
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(Brush.linearGradient(listOf(Color(0xFF7B61FF), Color(0xFF38BDF8))))
-                ) {
-                    Icon(
-                        imageVector = Icons.AutoMirrored.Filled.Send,
-                        contentDescription = "Enviar",
-                        tint = Color.White,
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-            }
-        }
+        // 4. Barra de Entrada Expandible Dinámica (1 a 6 líneas)
+        ExpandableInputBar(
+            promptText = promptText,
+            onPromptChange = { promptText = it },
+            onSendMessage = { text ->
+                onSendMessage(text)
+                promptText = ""
+            },
+            isLoading = isAiLoading
+        )
     }
 
     // Modal de Catálogo de Descarga de Agentes

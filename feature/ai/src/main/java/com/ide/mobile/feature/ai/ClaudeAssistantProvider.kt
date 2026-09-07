@@ -49,43 +49,41 @@ class ClaudeAssistantProvider(
         }
 
         val result = try {
-            fetchClaudeContent(userPrompt)
+            fetchClaudeContent(listOf(JSONObject().apply {
+                put("role", "user")
+                put("content", userPrompt)
+            }))
         } catch (e: Exception) {
             null
         }
 
         if (result != null && result.isNotBlank()) {
-            val words = result.split(" ")
-            for (i in words.indices) {
-                emit(words[i] + if (i < words.size - 1) " " else "")
-                delay(20)
+            val words = result.split("(?<=\\s)".toRegex())
+            for (word in words) {
+                emit(word)
+                delay(if (word.any { it in ".!?,;:" }) 50L else 15L)
             }
         } else {
-            emit("⚠️ Error de conexión con Anthropic Claude. Revisa tu clave y conectividad.")
+            emit("⚠️ Error de conexión: Claude no pudo procesar la solicitud. Verifica tu conexión o intenta de nuevo más tarde.")
         }
     }
 
-    private suspend fun fetchClaudeContent(promptText: String): String = withContext(Dispatchers.IO) {
+    private suspend fun fetchClaudeContent(messages: List<JSONObject>): String = withContext(Dispatchers.IO) {
         val url = URL("https://api.anthropic.com/v1/messages")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("x-api-key", apiKey)
             setRequestProperty("anthropic-version", "2023-06-01")
-            connectTimeout = 12000
-            readTimeout = 20000
+            connectTimeout = 15000
+            readTimeout = 30000
             doOutput = true
         }
 
         val root = JSONObject().apply {
             put("model", modelName)
             put("max_tokens", 1024)
-            put("messages", JSONArray().apply {
-                put(JSONObject().apply {
-                    put("role", "user")
-                    put("content", promptText)
-                })
-            })
+            put("messages", JSONArray(messages))
         }
 
         OutputStreamWriter(conn.outputStream, "UTF-8").use { writer ->
@@ -101,11 +99,18 @@ class ClaudeAssistantProvider(
             if (contentArray.length() > 0) {
                 return@withContext contentArray.getJSONObject(0).getString("text")
             }
+        } else {
+            val error = conn.errorStream?.bufferedReader()?.readText() ?: "Sin detalles"
+            throw Exception("HTTP $responseCode: $error")
         }
         ""
     }
 
     override suspend fun suggestQuickFix(errorMessage: String, faultyCode: String): String {
-        return "// [Claude QuickFix]\n$faultyCode // Solución a: $errorMessage"
+        val prompt = "Corrige este código. Error: $errorMessage. Código:\n$faultyCode\nDevuelve solo el código corregido."
+        return fetchClaudeContent(listOf(JSONObject().apply {
+            put("role", "user")
+            put("content", prompt)
+        })).ifBlank { "// [Claude QuickFix] No se pudo obtener la corrección.\n$faultyCode" }
     }
 }

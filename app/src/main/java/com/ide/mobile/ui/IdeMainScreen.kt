@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ide.mobile.core.model.ProjectFile
 import com.ide.mobile.feature.ai.ui.AiAssistantPanel
@@ -35,8 +36,10 @@ import com.ide.mobile.ui.components.BlackCatEditorWatermark
 import com.ide.mobile.ui.components.BlackCatLogo
 import com.ide.mobile.ui.views.FilesScreen
 import com.ide.mobile.ui.views.GitScreen
+import com.ide.mobile.ui.views.ProjectLauncherScreen
 import com.ide.mobile.ui.views.SearchScreen
 import com.ide.mobile.ui.views.SettingsScreen
+import com.ide.mobile.ui.views.SnippetVaultScreen
 import com.ide.mobile.ui.views.TerminalScreen
 import com.ide.mobile.ui.views.aihub.AiPluginsScreen
 import com.ide.mobile.ui.views.aihub.ModelManagementScreen
@@ -91,6 +94,7 @@ fun IdeMainScreen(
                         "TELEMETRY" -> viewModel.selectNavTab(MainNavTab.TELEMETRY)
                         "DOCS_RAG" -> viewModel.selectNavTab(MainNavTab.DOCS_RAG)
                         "SETTINGS" -> viewModel.selectNavTab(MainNavTab.SETTINGS)
+                        "SNIPPET_VAULT" -> viewModel.selectNavTab(MainNavTab.SNIPPET_VAULT)
                     }
                     coroutineScope.launch { drawerState.close() }
                 },
@@ -124,6 +128,10 @@ fun IdeMainScreen(
                         },
                         onOpenTemplates = {
                             showTemplatesDialog = true
+                            showMenuOptions = false
+                        },
+                        onOpenProjectLauncher = {
+                            viewModel.toggleProjectLauncher(true)
                             showMenuOptions = false
                         },
                         onSaveFile = {
@@ -336,19 +344,19 @@ fun IdeMainScreen(
                             },
                             onSaveGitHubConfig = { cfg ->
                                 viewModel.updateGitHubConfig(cfg)
-                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración GitHub guardada") }
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuracion GitHub guardada") }
                             },
                             onSaveExpoDevConfig = { cfg ->
                                 viewModel.updateExpoDevConfig(cfg)
-                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración Expo Dev guardada") }
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuracion Expo Dev guardada") }
                             },
                             onSaveRailwayConfig = { cfg ->
                                 viewModel.updateRailwayConfig(cfg)
-                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración Railway guardada") }
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuracion Railway guardada") }
                             },
                             onSaveLocalConfig = { host, port, model ->
                                 viewModel.updateLocalAiConfig(host, port, model)
-                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuración local guardada") }
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Configuracion local guardada") }
                             },
                             onTestConnection = { host, port ->
                                 viewModel.testLocalAiConnection(host, port)
@@ -358,6 +366,16 @@ fun IdeMainScreen(
                             onOpenRuntimeEngine = { viewModel.selectNavTab(MainNavTab.TELEMETRY) },
                             onOpenPluginsRouter = { viewModel.openAiSubPage(AiHubSubPage.PLUGINS_ROUTER) },
                             onOpenSiloLibrary = { viewModel.selectNavTab(MainNavTab.DOCS_RAG) }
+                        )
+                    }
+                    MainNavTab.SNIPPET_VAULT -> {
+                        SnippetVaultScreen(
+                            onInsertSnippet = { code ->
+                                viewModel.insertAiCodeIntoEditor(code)
+                                viewModel.selectNavTab(MainNavTab.EDITOR)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Snippet insertado en el editor") }
+                            },
+                            onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
                     }
                 }
@@ -542,6 +560,14 @@ fun IdeMainScreen(
     if (uiState.showCommandPalette) {
         val actions = listOf(
             CommandPaletteAction(
+                id = "open_launcher",
+                title = "📁 Gestor de Proyectos / Launcher",
+                subtitle = "Abrir, crear o importar espacios de trabajo",
+                icon = Icons.Default.FolderSpecial,
+                tint = Color(0xFF00E5FF),
+                onExecute = { viewModel.toggleProjectLauncher(true) }
+            ),
+            CommandPaletteAction(
                 id = "run_smart",
                 title = "▶ Ejecutar Proyecto / Archivo",
                 subtitle = "Ejecuta con medición de tiempo o vista previa",
@@ -648,6 +674,37 @@ fun IdeMainScreen(
         )
     }
 
+    // Modal: Gestor de Espacios de Trabajo / Project Launcher
+    if (uiState.showProjectLauncher) {
+        Dialog(
+            onDismissRequest = { viewModel.toggleProjectLauncher(false) },
+            properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)
+        ) {
+            ProjectLauncherScreen(
+                workspaceState = uiState.workspaceState,
+                onOpenProject = { proj ->
+                    viewModel.openWorkspaceProject(proj)
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Espacio de trabajo: ${proj.name}") }
+                },
+                onNewProjectFromTemplate = {
+                    viewModel.toggleProjectLauncher(false)
+                    showTemplatesDialog = true
+                },
+                onImportLocalDirectory = { path, name ->
+                    viewModel.importLocalDirectory(path, name)
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Importando $path...") }
+                },
+                onCloneRemoteRepo = { url, dest ->
+                    viewModel.cloneRemoteRepository(url, dest)
+                    coroutineScope.launch { snackbarHostState.showSnackbar("Clonando repositorio...") }
+                },
+                onDeleteProject = { id -> viewModel.deleteWorkspaceProject(id) },
+                onToggleFavorite = { id -> viewModel.toggleProjectFavorite(id) },
+                onDismiss = { viewModel.toggleProjectLauncher(false) }
+            )
+        }
+    }
+
     if (showTemplatesDialog) {
         AlertDialog(
             onDismissRequest = { showTemplatesDialog = false },
@@ -747,6 +804,7 @@ private fun IdeTopAppBar(
     onOpenCommandPalette: () -> Unit = {},
     onFormatCode: () -> Unit = {},
     onOpenTemplates: () -> Unit = {},
+    onOpenProjectLauncher: () -> Unit = {},
     onSaveFile: () -> Unit,
     onNewFile: () -> Unit,
     onNewFolder: () -> Unit,
@@ -793,6 +851,7 @@ private fun IdeTopAppBar(
                     MainNavTab.TELEMETRY -> "Telemetría & RAM"
                     MainNavTab.DOCS_RAG -> "Base de Conocimiento RAG"
                     MainNavTab.SETTINGS -> "Ajustes"
+                    MainNavTab.SNIPPET_VAULT -> "📦 Snippet Vault"
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -870,6 +929,10 @@ private fun IdeTopAppBar(
                     DropdownMenuItem(
                         text = { Text("✨ Formatear Código", color = Color(0xFFA78BFA)) },
                         onClick = onFormatCode
+                    )
+                    DropdownMenuItem(
+                        text = { Text("📁 Gestor de Proyectos / Launcher", color = Color(0xFF00E5FF)) },
+                        onClick = onOpenProjectLauncher
                     )
                     DropdownMenuItem(
                         text = { Text("📦 Proyecto desde Plantilla...", color = Color(0xFF38BDF8)) },
@@ -1113,7 +1176,8 @@ private fun IdeCategoryNavBar(
         Triple(MainNavTab.MODELS, Icons.Default.CloudDownload, "Modelos"),
         Triple(MainNavTab.TELEMETRY, Icons.Default.Speed, "Telemetría"),
         Triple(MainNavTab.DOCS_RAG, Icons.Default.MenuBook, "Docs RAG"),
-        Triple(MainNavTab.SETTINGS, Icons.Default.Settings, "Ajustes")
+        Triple(MainNavTab.SETTINGS, Icons.Default.Settings, "Ajustes"),
+        Triple(MainNavTab.SNIPPET_VAULT, Icons.Default.DataObject, "Snippets")
     )
 
     Surface(
@@ -1142,6 +1206,7 @@ private fun IdeCategoryNavBar(
                     MainNavTab.TELEMETRY -> Color(0xFF4ADE80)
                     MainNavTab.DOCS_RAG -> Color(0xFFA78BFA)
                     MainNavTab.SETTINGS -> Color(0xFF94A3B8)
+                    MainNavTab.SNIPPET_VAULT -> Color(0xFFF59E0B)
                 }
 
                 Row(

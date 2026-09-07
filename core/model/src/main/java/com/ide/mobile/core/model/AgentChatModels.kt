@@ -49,18 +49,63 @@ data class AgentAction(
 )
 
 /**
+ * Contenido estructurado de un mensaje en el chat del asistente IA.
+ */
+sealed interface ChatContent {
+    data class Text(val text: String) : ChatContent
+    data class CodeBlock(val code: String, val language: String = "kotlin") : ChatContent
+    data class ActionCard(val action: AgentAction) : ChatContent
+}
+
+/**
  * Mensaje individual dentro del historial de conversación fluida.
  */
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
     val sender: MessageSender,
-    val text: String,
+    val text: String = "",
+    val contents: List<ChatContent> = emptyList(),
     val timestamp: Long = System.currentTimeMillis(),
     val agentName: String? = null,
     val agentIcon: String? = null,
     val actions: List<AgentAction> = emptyList(),
     val isStreaming: Boolean = false
-)
+) {
+    /**
+     * Obtiene la lista de contenidos estructurados. Si [contents] está vacío pero [text]
+     * contiene texto o bloques de código markdown (```lenguaje ... ```),
+     * los analiza dinámicamente y los combina con [actions].
+     */
+    val resolvedContents: List<ChatContent>
+        get() {
+            if (contents.isNotEmpty()) return contents
+            val result = mutableListOf<ChatContent>()
+            if (text.isNotBlank()) {
+                val codeBlockRegex = "```([a-zA-Z0-9_\\-]*)\\n([\\s\\S]*?)```".toRegex()
+                var lastIndex = 0
+                for (match in codeBlockRegex.findAll(text)) {
+                    val preText = text.substring(lastIndex, match.range.first).trim()
+                    if (preText.isNotEmpty()) {
+                        result.add(ChatContent.Text(preText))
+                    }
+                    val lang = match.groupValues[1].ifBlank { "kotlin" }
+                    val code = match.groupValues[2].trimEnd()
+                    result.add(ChatContent.CodeBlock(code = code, language = lang))
+                    lastIndex = match.range.last + 1
+                }
+                if (lastIndex < text.length) {
+                    val remaining = text.substring(lastIndex).trim()
+                    if (remaining.isNotEmpty()) {
+                        result.add(ChatContent.Text(remaining))
+                    }
+                }
+            }
+            actions.forEach { action ->
+                result.add(ChatContent.ActionCard(action))
+            }
+            return result
+        }
+}
 
 /**
  * Agente Antigravity descargable con especificación completa y lista para activar.

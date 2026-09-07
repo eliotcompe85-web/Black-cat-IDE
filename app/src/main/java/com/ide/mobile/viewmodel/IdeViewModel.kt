@@ -42,6 +42,11 @@ import com.ide.mobile.feature.ai.AiAssistantManager
 import com.ide.mobile.feature.ai.CodeContext
 import com.ide.mobile.feature.ai.LocalAgentEngine
 import com.ide.mobile.feature.ai.ProviderType
+import com.ide.mobile.core.model.Project
+import com.ide.mobile.core.model.WorkspaceState
+import com.ide.mobile.core.model.WorkspaceRepository
+import com.ide.mobile.core.model.RoomWorkspaceRepository
+import com.ide.mobile.feature.explorer.WorkspaceImportService
 import com.ide.mobile.feature.ai.downloader.ModelDownloadManager
 import com.ide.mobile.feature.ai.rag.SiloKnowledgeEngine
 import com.ide.mobile.feature.ai.router.SmartInferenceRouter
@@ -61,7 +66,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class MainNavTab {
-    EDITOR, FILES, AI_ASSISTANT, TERMINAL, SEARCH, GIT, MODELS, TELEMETRY, DOCS_RAG, SETTINGS
+    EDITOR, FILES, AI_ASSISTANT, TERMINAL, SEARCH, GIT, MODELS, TELEMETRY, DOCS_RAG, SETTINGS, SNIPPET_VAULT
 }
 
 
@@ -129,7 +134,10 @@ data class IdeUiState(
     val deploymentMessage: String? = null,
     val deploymentRecords: List<DeploymentRecord> = emptyList(),
     val showCommandPalette: Boolean = false,
-    val projectTemplates: List<ProjectTemplate> = ProjectTemplate.ALL_TEMPLATES
+    val projectTemplates: List<ProjectTemplate> = ProjectTemplate.ALL_TEMPLATES,
+    val workspaceState: WorkspaceState = WorkspaceState(),
+    val showProjectLauncher: Boolean = false,
+    val showSnippetVault: Boolean = false
 )
 
 @OptIn(FlowPreview::class)
@@ -147,6 +155,8 @@ class IdeViewModel : ViewModel() {
     private val telemetryService = DeviceTelemetryService(viewModelScope)
     private val routerEngine = SmartInferenceRouter()
     private val siloEngine = SiloKnowledgeEngine()
+    val workspaceRepository: WorkspaceRepository = RoomWorkspaceRepository()
+    val workspaceImportService = WorkspaceImportService(workspaceRepository)
 
     private var currentDocumentVersion: Long = 1L
     private var activeAnalysisJob: Job? = null
@@ -206,6 +216,11 @@ class IdeViewModel : ViewModel() {
         viewModelScope.launch {
             siloEngine.documents.collect { docs ->
                 _uiState.update { it.copy(ragDocuments = docs) }
+            }
+        }
+        viewModelScope.launch {
+            workspaceRepository.workspaceState.collect { ws ->
+                _uiState.update { it.copy(workspaceState = ws) }
             }
         }
     }
@@ -1161,5 +1176,149 @@ class IdeViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    // ==========================================
+    // WORKSPACE & PROJECT LAUNCHER MANAGEMENT
+    // ==========================================
+
+    fun toggleProjectLauncher(show: Boolean) {
+        _uiState.update { it.copy(showProjectLauncher = show) }
+    }
+
+    fun openWorkspaceProject(project: Project) {
+        viewModelScope.launch {
+            workspaceRepository.setCurrentProject(project)
+            _uiState.update {
+                it.copy(
+                    showProjectLauncher = false,
+                    consoleLogs = it.consoleLogs + listOf(
+                        "[Workspace] Proyecto activo cambiado a '${project.name}'",
+                        "[Workspace] Ruta: ${project.path}"
+                    )
+                )
+            }
+        }
+    }
+
+    fun importLocalDirectory(path: String, name: String? = null) {
+        viewModelScope.launch {
+            val result = workspaceImportService.importProject(path, name)
+            result.onSuccess { proj ->
+                _uiState.update {
+                    it.copy(
+                        showProjectLauncher = false,
+                        consoleLogs = it.consoleLogs + listOf(
+                            "[Workspace] ✓ Proyecto '${proj.name}' importado exitosamente (${proj.projectType.name})",
+                            "[Workspace] Ruta: ${proj.path}"
+                        )
+                    )
+                }
+            }.onFailure { err ->
+                _uiState.update {
+                    it.copy(
+                        consoleLogs = it.consoleLogs + listOf(
+                            "[Workspace] ✗ Error al importar directorio: ${err.message}"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun cloneRemoteRepository(url: String, destPath: String) {
+        viewModelScope.launch {
+            val projName = url.substringAfterLast("/").removeSuffix(".git").ifBlank { "ClonedProject" }
+            val result = workspaceImportService.importProject(destPath, projName)
+            result.onSuccess { proj ->
+                _uiState.update {
+                    it.copy(
+                        showProjectLauncher = false,
+                        consoleLogs = it.consoleLogs + listOf(
+                            "[Git] ✓ Clonación y registro exitoso: '${proj.name}'",
+                            "[Git] URL: $url",
+                            "[Workspace] Ruta local: ${proj.path}"
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    fun deleteWorkspaceProject(projectId: String) {
+        viewModelScope.launch {
+            workspaceRepository.deleteProject(projectId)
+        }
+    }
+
+    fun toggleProjectFavorite(projectId: String) {
+        viewModelScope.launch {
+            workspaceRepository.toggleFavorite(projectId)
+        }
+    }
+
+    // ==========================================
+    // FILE OPERATIONS
+    // ==========================================
+
+    /**
+     * Renombra el archivo activo (en memoria) y lo vuelve a abrir con el nuevo nombre.
+     */
+    fun renameFile(newName: String) {
+        val file = _uiState.value.activeFile
+        val clean = newName.trim()
+        if (clean.isBlank() || clean == file.name) return
+        val updatedFile = file.copy(
+            name = clean,
+            path = file.path.substringBeforeLast("/") + "/$clean"
+        )
+        _uiState.update {
+            it.copy(
+                openTabs = it.openTabs.map { tab -> if (tab.id == file.id) updatedFile else tab },
+                activeFile = updatedFile,
+                consoleLogs = it.consoleLogs + listOf("[Archivos] Archivo renombrado: $clean")
+            )
+        }
+    }
+
+    /**
+     * Duplica el archivo activo con sufijo "_copia" y lo abre en una nueva pestaña.
+     */
+    fun duplicateCurrentFile() {
+        val source = _uiState.value.activeFile
+        val ext = source.name.substringAfterLast(".", "")
+        val baseName = source.name.substringBeforeLast(".")
+        val copyName = if (ext.isNotBlank()) "${baseName}_copia.$ext" else "${baseName}_copia"
+        val copyPath = source.path.substringBeforeLast("/") + "/$copyName"
+        val copy = ProjectFile(
+            id = "file-dup-${System.currentTimeMillis()}",
+            name = copyName,
+            path = copyPath,
+            isDirectory = false,
+            content = source.content
+        )
+        // Añadir al árbol bajo el mismo padre
+        val parent = _uiState.value.rootProject.flatten()
+            .firstOrNull { it.isDirectory && it.path == source.path.substringBeforeLast("/") }
+        parent?.children?.add(copy)
+        openFile(copy)
+        _uiState.update {
+            it.copy(consoleLogs = it.consoleLogs + listOf("[Archivos] Duplicado creado: $copyName"))
+        }
+    }
+
+    /**
+     * Retorna el contenido raw del archivo activo para ser compartido / exportado.
+     */
+    fun exportCurrentFileContent(): String {
+        return _uiState.value.editorValue.text
+    }
+
+    // ==========================================
+    // SNIPPET VAULT
+    // ==========================================
+
+    fun toggleSnippetVault(show: Boolean? = null) {
+        _uiState.update { it.copy(showSnippetVault = show ?: !it.showSnippetVault) }
     }
 }
