@@ -110,11 +110,16 @@ object AntigravityArtifactParser {
                     .filter { it.isNotBlank() && !it.startsWith("#") }
 
                 cmdLines.forEach { cmd ->
+                    val actionType = when {
+                        cmd.startsWith("flutter pub add ") || cmd.startsWith("npm install ") || cmd.startsWith("npm i ") -> AgentActionType.INSTALL_DEPENDENCY
+                        cmd.startsWith("mkdir ") -> AgentActionType.CREATE_FOLDER
+                        else -> AgentActionType.RUN_COMMAND
+                    }
                     contents.add(
                         ChatContent.ActionCard(
                             AgentAction(
                                 id = UUID.randomUUID().toString(),
-                                type = AgentActionType.RUN_COMMAND,
+                                type = actionType,
                                 title = "Ejecutar: $cmd",
                                 description = "Comando en la terminal interactiva de Black Cat IDE",
                                 payload = cmd,

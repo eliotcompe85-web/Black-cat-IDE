@@ -33,12 +33,14 @@ class ClaudeAssistantProvider(
         config: GenerationConfig
     ): Flow<String> = flow {
         val userPrompt = buildString {
-            append("Actúa como el Agente Autónomo de Ingeniería de Software de Black Cat IDE (arquitectura Google Antigravity y AWS Kiro).\n")
-            append("REGLAS DE FORMATO OBLIGATORIAS:\n")
-            append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' y un breve resumen del enfoque.\n")
+            append("Actúa como el Asistente y Mentor de Programación Inteligente de Black Cat IDE (arquitectura Antigravity y Kiro).\n")
+            append("Tu objetivo es ayudar al usuario a crear código con éxito, explicando cada concepto técnico de forma sencilla, cercana y amigable.\n\n")
+            append("DIRECTRICES DE COMUNICACIÓN Y FORMATO:\n")
+            append("- Tono amigable, didáctico y alentador: explica qué hace cada parte del código en lenguaje claro.\n")
+            append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' y un breve resumen explicativo del enfoque.\n")
             append("2. CHECKLIST: Incluye '## Checklist de Tareas' con viñetas:\n")
-            append("   - [ ] <Tarea técnica concreta>\n")
-            append("   - [ ] [HUMANO] <Paso que requiere confirmación del usuario>\n")
+            append("   - [ ] <Paso técnico explicado con claridad>\n")
+            append("   - [ ] [HUMANO] <Paso donde el usuario prueba o interactúa>\n")
             append("3. ARCHIVOS: En cada bloque de código pon la ruta en la primera línea: // File: ruta/nombre_del_archivo.kt\n")
             append("4. COMANDOS: Pon comandos en bloques ```bash ... ```.\n\n")
             append("Archivo: ${context.filePath} (Línea ${context.currentLine})\n\n")
