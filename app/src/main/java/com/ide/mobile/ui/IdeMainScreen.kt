@@ -25,6 +25,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.ide.mobile.core.model.ProjectFile
 import com.ide.mobile.feature.ai.ui.AiAssistantPanel
+import com.ide.mobile.feature.ai.ui.MissionControlDashboard
 import com.ide.mobile.feature.compiler.LiveComposePreviewHost
 import com.ide.mobile.feature.editor.CodeEditorCore
 import com.ide.mobile.feature.explorer.ProjectExplorerDrawer
@@ -95,6 +96,7 @@ fun IdeMainScreen(
                         "DOCS_RAG" -> viewModel.selectNavTab(MainNavTab.DOCS_RAG)
                         "SETTINGS" -> viewModel.selectNavTab(MainNavTab.SETTINGS)
                         "SNIPPET_VAULT" -> viewModel.selectNavTab(MainNavTab.SNIPPET_VAULT)
+                        "MISSION_CONTROL" -> viewModel.selectNavTab(MainNavTab.MISSION_CONTROL)
                     }
                     coroutineScope.launch { drawerState.close() }
                 },
@@ -245,6 +247,7 @@ fun IdeMainScreen(
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Código inyectado en el editor") }
                             },
                             onClose = { viewModel.selectNavTab(MainNavTab.EDITOR) },
+                            onOpenMissionControl = { viewModel.selectNavTab(MainNavTab.MISSION_CONTROL) },
                             modifier = Modifier.fillMaxSize()
                         )
                     }
@@ -376,6 +379,20 @@ fun IdeMainScreen(
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Snippet insertado en el editor") }
                             },
                             onBack = { viewModel.selectNavTab(MainNavTab.EDITOR) }
+                        )
+                    }
+                    MainNavTab.MISSION_CONTROL -> {
+                        MissionControlDashboard(
+                            activeAgents = uiState.activeMissionAgents,
+                            onDelegateTask = {
+                                viewModel.selectNavTab(MainNavTab.AI_ASSISTANT)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Selecciona un agente para delegar una nueva tarea") }
+                            },
+                            onResumeAgent = { agentId ->
+                                viewModel.resumeAgentMission(agentId)
+                                coroutineScope.launch { snackbarHostState.showSnackbar("Reanudando agente...") }
+                            },
+                            onClose = { viewModel.selectNavTab(MainNavTab.EDITOR) }
                         )
                     }
                 }
@@ -852,6 +869,7 @@ private fun IdeTopAppBar(
                     MainNavTab.DOCS_RAG -> "Base de Conocimiento RAG"
                     MainNavTab.SETTINGS -> "Ajustes"
                     MainNavTab.SNIPPET_VAULT -> "📦 Snippet Vault"
+                    MainNavTab.MISSION_CONTROL -> "🛸 Mission Control"
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1177,7 +1195,8 @@ private fun IdeCategoryNavBar(
         Triple(MainNavTab.TELEMETRY, Icons.Default.Speed, "Telemetría"),
         Triple(MainNavTab.DOCS_RAG, Icons.Default.MenuBook, "Docs RAG"),
         Triple(MainNavTab.SETTINGS, Icons.Default.Settings, "Ajustes"),
-        Triple(MainNavTab.SNIPPET_VAULT, Icons.Default.DataObject, "Snippets")
+        Triple(MainNavTab.SNIPPET_VAULT, Icons.Default.DataObject, "Snippets"),
+        Triple(MainNavTab.MISSION_CONTROL, Icons.Default.Dashboard, "Misión")
     )
 
     Surface(
@@ -1207,6 +1226,7 @@ private fun IdeCategoryNavBar(
                     MainNavTab.DOCS_RAG -> Color(0xFFA78BFA)
                     MainNavTab.SETTINGS -> Color(0xFF94A3B8)
                     MainNavTab.SNIPPET_VAULT -> Color(0xFFF59E0B)
+                    MainNavTab.MISSION_CONTROL -> Color(0xFFE879F9)
                 }
 
                 Row(

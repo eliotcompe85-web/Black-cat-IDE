@@ -176,6 +176,7 @@ fun ProjectExplorerDrawer(
                 DrawerNavigationItem(icon = Icons.Default.Code, label = "Editor de Código", tint = Color(0xFF7B61FF)) { onNavigatePage("EDITOR") }
                 DrawerNavigationItem(icon = Icons.Default.Folder, label = "Explorador de Archivos", tint = Color(0xFFFBBF24)) { onNavigatePage("FILES") }
                 DrawerNavigationItem(icon = Icons.Default.AutoFixHigh, label = "Asistente IA & Agentes", tint = Color(0xFFC084FC)) { onNavigatePage("AI_ASSISTANT") }
+                DrawerNavigationItem(icon = Icons.Default.Dashboard, label = "Mission Control 🛸", tint = Color(0xFFE879F9)) { onNavigatePage("MISSION_CONTROL") }
                 DrawerNavigationItem(icon = Icons.Default.Terminal, label = "Terminal Interactiva", tint = Color(0xFF34D399)) { onNavigatePage("TERMINAL") }
                 DrawerNavigationItem(icon = Icons.Default.Search, label = "Búsqueda en Proyecto", tint = Color(0xFF38BDF8)) { onNavigatePage("SEARCH") }
                 DrawerNavigationItem(icon = Icons.Default.AccountTree, label = "Control Git", tint = Color(0xFFF97316)) { onNavigatePage("GIT") }

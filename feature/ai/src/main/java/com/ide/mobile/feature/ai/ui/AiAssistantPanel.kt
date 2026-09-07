@@ -54,6 +54,7 @@ fun AiAssistantPanel(
     onClearChat: () -> Unit = {},
     onInsertCode: (String) -> Unit = {},
     onClose: () -> Unit = {},
+    onOpenMissionControl: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var promptText by remember { mutableStateOf("") }
@@ -176,6 +177,20 @@ fun AiAssistantPanel(
                                 tint = Color(0xFF38BDF8),
                                 modifier = Modifier.size(18.dp)
                             )
+                        }
+
+                        if (onOpenMissionControl != null) {
+                            IconButton(
+                                onClick = onOpenMissionControl,
+                                modifier = Modifier.size(30.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Dashboard,
+                                    contentDescription = "Mission Control",
+                                    tint = Color(0xFFE879F9),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                            }
                         }
 
                         IconButton(
@@ -404,13 +419,10 @@ fun AiAssistantPanel(
             }
         }
 
-        // 4. Barra de Entrada Expandible Dinámica (1 a 6 líneas)
-        ExpandableInputBar(
-            promptText = promptText,
-            onPromptChange = { promptText = it },
-            onSendMessage = { text ->
+        // 4. Barra de Entrada Expandible Dinámica Multimodal (con soporte de visión y fotos adjuntas)
+        ExpandableMultimodalInputBar(
+            onSendMessage = { text, _ ->
                 onSendMessage(text)
-                promptText = ""
             },
             isLoading = isAiLoading
         )

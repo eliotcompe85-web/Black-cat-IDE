@@ -5,8 +5,10 @@ import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.ide.mobile.core.model.ActionStatus
+import com.ide.mobile.core.model.ActiveAgentContext
 import com.ide.mobile.core.model.AgentAction
 import com.ide.mobile.core.model.AgentActionType
+import com.ide.mobile.core.model.AgentState
 import com.ide.mobile.core.model.AnalysisRequest
 import com.ide.mobile.core.model.AnalysisResponse
 import com.ide.mobile.core.model.AnalysisStatus
@@ -66,7 +68,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 enum class MainNavTab {
-    EDITOR, FILES, AI_ASSISTANT, TERMINAL, SEARCH, GIT, MODELS, TELEMETRY, DOCS_RAG, SETTINGS, SNIPPET_VAULT
+    EDITOR, FILES, AI_ASSISTANT, TERMINAL, SEARCH, GIT, MODELS, TELEMETRY, DOCS_RAG, SETTINGS, SNIPPET_VAULT, MISSION_CONTROL
 }
 
 
@@ -137,7 +139,15 @@ data class IdeUiState(
     val projectTemplates: List<ProjectTemplate> = ProjectTemplate.ALL_TEMPLATES,
     val workspaceState: WorkspaceState = WorkspaceState(),
     val showProjectLauncher: Boolean = false,
-    val showSnippetVault: Boolean = false
+    val showSnippetVault: Boolean = false,
+    val activeMissionAgents: List<ActiveAgentContext> = listOf(
+        ActiveAgentContext(
+            agentId = "1",
+            agentName = "Local Copilot (Default)",
+            isLocal = true,
+            currentState = AgentState.Idle
+        )
+    )
 )
 
 @OptIn(FlowPreview::class)
@@ -838,6 +848,20 @@ class IdeViewModel : ViewModel() {
                 )
             }
         }
+    }
+
+    fun updateAgentMissionState(agentId: String, newState: AgentState) {
+        _uiState.update { state ->
+            state.copy(
+                activeMissionAgents = state.activeMissionAgents.map {
+                    if (it.agentId == agentId) it.copy(currentState = newState) else it
+                }
+            )
+        }
+    }
+
+    fun resumeAgentMission(agentId: String) {
+        updateAgentMissionState(agentId, AgentState.Executing("Reanudando ejecución colaborativa...", 0.75f))
     }
 
     fun runProject() {

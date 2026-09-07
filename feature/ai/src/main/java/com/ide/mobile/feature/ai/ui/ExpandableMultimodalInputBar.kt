@@ -34,6 +34,7 @@ private const val IMAGE_MIME_TYPE = "image/*"
 @Composable
 fun ExpandableMultimodalInputBar(
     onSendMessage: (text: String, attachments: List<Uri>) -> Unit,
+    isLoading: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     var textState by remember { mutableStateOf("") }
@@ -155,7 +156,7 @@ fun ExpandableMultimodalInputBar(
                 Spacer(modifier = Modifier.width(8.dp))
 
                 // Botón de Envío
-                val isEnabled = textState.isNotBlank() || attachedUris.isNotEmpty()
+                val isEnabled = (textState.isNotBlank() || attachedUris.isNotEmpty()) && !isLoading
                 FloatingActionButton(
                     onClick = {
                         if (isEnabled) {
@@ -170,11 +171,19 @@ fun ExpandableMultimodalInputBar(
                     modifier = Modifier.size(44.dp),
                     shape = CircleShape
                 ) {
-                    Icon(
-                        imageVector = Icons.Default.Send,
-                        contentDescription = "Enviar mensaje al agente",
-                        modifier = Modifier.size(20.dp)
-                    )
+                    if (isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(20.dp),
+                            strokeWidth = 2.dp,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    } else {
+                        Icon(
+                            imageVector = Icons.Default.Send,
+                            contentDescription = "Enviar mensaje al agente",
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                 }
             }
         }

@@ -25,14 +25,14 @@ import com.ide.mobile.core.model.AgentState
 @Composable
 fun MissionControlDashboard(
     activeAgents: List<ActiveAgentContext>,
-    onDelegateTask: () -> Unit,
-    onResumeAgent: (String) -> Unit,
+    onDelegateTask: () -> Unit = {},
+    onResumeAgent: (String) -> Unit = {},
+    onClose: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     Column(
         modifier = modifier
-            .fillMaxHeight()
-            .width(320.dp) // Ancho típico de panel lateral
+            .fillMaxSize()
             .background(Color(0xFF0D0F18))
             .padding(16.dp)
     ) {
@@ -43,17 +43,28 @@ fun MissionControlDashboard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                text = "Mission Control",
+                text = "Mission Control 🛸",
                 style = MaterialTheme.typography.titleLarge,
                 fontWeight = FontWeight.Bold,
                 color = MaterialTheme.colorScheme.onSurface
             )
-            IconButton(onClick = onDelegateTask) {
-                Icon(
-                    imageVector = Icons.Default.AddTask,
-                    contentDescription = "Delegar nueva tarea",
-                    tint = MaterialTheme.colorScheme.primary
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(onClick = onDelegateTask) {
+                    Icon(
+                        imageVector = Icons.Default.AddTask,
+                        contentDescription = "Delegar nueva tarea",
+                        tint = MaterialTheme.colorScheme.primary
+                    )
+                }
+                if (onClose != null) {
+                    IconButton(onClick = onClose) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Cerrar",
+                            tint = Color(0xFF94A3B8)
+                        )
+                    }
+                }
             }
         }
 
