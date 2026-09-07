@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -34,6 +35,9 @@ fun ChatMessageBubble(
     onRejectAction: (AgentAction) -> Unit,
     onViewInTerminal: ((AgentAction) -> Unit)? = null,
     onApplyCode: ((String) -> Unit)? = null,
+    onApplyCodeWithTarget: ((String, String?) -> Unit)? = null,
+    onToggleTask: ((String, String) -> Unit)? = null,
+    onProceedPlan: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     val isUser = message.sender == MessageSender.USER
@@ -173,32 +177,72 @@ fun ChatMessageBubble(
                                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
                                 ) {
                                     Column(modifier = Modifier.padding(12.dp)) {
-                                        Text(
-                                            text = "📋 ${content.title}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            fontWeight = FontWeight.Bold,
-                                            color = Color(0xFF38BDF8)
-                                        )
+                                        Row(
+                                            modifier = Modifier.fillMaxWidth(),
+                                            horizontalArrangement = Arrangement.SpaceBetween,
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Text(
+                                                text = "📋 ${content.title}",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = Color(0xFF38BDF8)
+                                            )
+                                            Surface(
+                                                color = Color(0xFF10B981).copy(alpha = 0.2f),
+                                                shape = RoundedCornerShape(6.dp),
+                                                border = BorderStroke(0.5.dp, Color(0xFF10B981))
+                                            ) {
+                                                Text(
+                                                    text = "Plan Propuesto",
+                                                    color = Color(0xFF34D399),
+                                                    fontSize = 10.sp,
+                                                    fontWeight = FontWeight.Bold,
+                                                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                                )
+                                            }
+                                        }
                                         Spacer(modifier = Modifier.height(6.dp))
                                         Text(
                                             text = content.summary,
                                             style = MaterialTheme.typography.bodySmall,
                                             color = Color(0xFFCBD5E1)
                                         )
+                                        if (onProceedPlan != null) {
+                                            Spacer(modifier = Modifier.height(10.dp))
+                                            Button(
+                                                onClick = onProceedPlan,
+                                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF)),
+                                                shape = RoundedCornerShape(8.dp),
+                                                modifier = Modifier.fillMaxWidth().height(36.dp)
+                                            ) {
+                                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                                Spacer(modifier = Modifier.width(6.dp))
+                                                Text("Proceder y Ejecutar Plan ▶", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
                                     }
                                 }
                             }
                             is ChatContent.ActionChecklist -> {
                                 ActionChecklistCard(
                                     content = content,
-                                    onHumanTaskToggled = { _, _ -> }
+                                    onHumanTaskToggled = { taskId, _ ->
+                                        onToggleTask?.invoke(message.id, taskId)
+                                    }
                                 )
                             }
                             is ChatContent.CodeBlock -> {
                                 if (content.targetFilePath != null) {
                                     CodeBlockArtifactCard(
                                         content = content,
-                                        onApplyToWorkspace = { code, _ -> onApplyCode?.invoke(code) }
+                                        onApplyToWorkspace = { code, path ->
+                                            if (onApplyCodeWithTarget != null) {
+                                                onApplyCodeWithTarget.invoke(code, path)
+                                            } else {
+                                                onApplyCode?.invoke(code)
+                                            }
+                                        }
                                     )
                                 } else {
                                     CodeBlockCard(

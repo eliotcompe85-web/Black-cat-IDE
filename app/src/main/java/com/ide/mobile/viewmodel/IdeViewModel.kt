@@ -15,6 +15,8 @@ import com.ide.mobile.core.model.AnalysisStatus
 import com.ide.mobile.core.model.ApiKeysConfig
 import com.ide.mobile.core.model.BuildProgress
 import com.ide.mobile.core.model.BuildStep
+import com.ide.mobile.core.model.ChatContent
+import com.ide.mobile.core.model.ChecklistTask
 import com.ide.mobile.core.model.ChatMessage
 import com.ide.mobile.core.model.DiagnosticIssue
 import com.ide.mobile.core.model.DiagnosticsState
@@ -41,6 +43,7 @@ import com.ide.mobile.core.model.Severity
 import com.ide.mobile.feature.editor.SmartCodeFormatter
 import com.ide.mobile.feature.ai.AgentActionParser
 import com.ide.mobile.feature.ai.AiAssistantManager
+import com.ide.mobile.feature.ai.AntigravityArtifactParser
 import com.ide.mobile.feature.ai.CodeContext
 import com.ide.mobile.feature.ai.LocalAgentEngine
 import com.ide.mobile.feature.ai.ProviderType
@@ -692,6 +695,33 @@ class IdeViewModel : ViewModel() {
         if (cleanPrompt.isBlank()) return
         activeAiJob?.cancel()
 
+        // Manejo nativo de Comandos Slash (Protocolo Antigravity & Kiro)
+        if (cleanPrompt.equals("/clear", ignoreCase = true)) {
+            clearChatHistory()
+            return
+        }
+        if (cleanPrompt.equals("/run", ignoreCase = true)) {
+            runProject()
+            return
+        }
+        if (cleanPrompt.equals("/test", ignoreCase = true)) {
+            executeTerminalCommand("flutter test")
+            _uiState.update { it.copy(showTerminal = true, currentNavTab = MainNavTab.TERMINAL) }
+            return
+        }
+
+        val effectivePrompt = when {
+            cleanPrompt.startsWith("/plan", ignoreCase = true) ->
+                "Genera un Plan de Implementación estructurado (# Plan: <Título>) con su '## Checklist de Tareas' (- [ ]) y código para: " + cleanPrompt.removePrefix("/plan").trim()
+            cleanPrompt.startsWith("/review", ignoreCase = true) ->
+                "Realiza una revisión técnica minuciosa de código del archivo actual, señalando mejoras y generando correcciones si aplican: " + cleanPrompt.removePrefix("/review").trim()
+            cleanPrompt.startsWith("/fix", ignoreCase = true) ->
+                "Analiza y corrige los errores sintácticos o de compilación en el archivo actual, proporcionando el bloque de código corregido: " + cleanPrompt.removePrefix("/fix").trim()
+            cleanPrompt.startsWith("/diff", ignoreCase = true) ->
+                "Explica las diferencias y cambios propuestos para el archivo actual: " + cleanPrompt.removePrefix("/diff").trim()
+            else -> cleanPrompt
+        }
+
         val activeAgent = _uiState.value.activeAgent
         val userMsg = ChatMessage(
             sender = MessageSender.USER,
@@ -710,9 +740,15 @@ class IdeViewModel : ViewModel() {
             it.copy(
                 chatMessages = updatedMessages,
                 isAiLoading = true,
-                currentExecutionStep = "Analizando requerimientos y código..."
+                currentExecutionStep = "Planificando solución y analizando código..."
             )
         }
+
+        // 1. Sincronizar Mission Control en Fase Planning
+        updateAgentMissionState(
+            activeAgent.id,
+            AgentState.Planning("Analizando requerimientos y arquitectura del proyecto...")
+        )
 
         activeAiJob = viewModelScope.launch {
             val codeCtx = CodeContext(
@@ -722,8 +758,14 @@ class IdeViewModel : ViewModel() {
                 filePath = _uiState.value.activeFile.path
             )
 
+            // 2. Transición a Fase Executing durante la generación
+            updateAgentMissionState(
+                activeAgent.id,
+                AgentState.Executing("Generando artefactos y código...", 0.45f)
+            )
+
             val buffer = StringBuilder()
-            aiManager.generateCompletionStream(cleanPrompt, codeCtx).collect { chunk ->
+            aiManager.generateCompletionStream(effectivePrompt, codeCtx).collect { chunk ->
                 buffer.append(chunk)
                 val currentText = buffer.toString()
                 _uiState.update { state ->
@@ -738,6 +780,7 @@ class IdeViewModel : ViewModel() {
 
             val finalResponse = buffer.toString()
             val parsedActions = AgentActionParser.parseActions(finalResponse)
+            val structuredContents = AntigravityArtifactParser.parseResponse(finalResponse, parsedActions)
 
             _uiState.update { state ->
                 val msgs = state.chatMessages.toMutableList()
@@ -745,6 +788,7 @@ class IdeViewModel : ViewModel() {
                 if (lastIdx != -1) {
                     msgs[lastIdx] = msgs[lastIdx].copy(
                         text = finalResponse,
+                        contents = structuredContents,
                         actions = parsedActions,
                         isStreaming = false
                     )
@@ -754,6 +798,38 @@ class IdeViewModel : ViewModel() {
                     isAiLoading = false,
                     currentExecutionStep = if (parsedActions.isNotEmpty()) "Acciones propuestas listas para revisar" else null
                 )
+            }
+
+            // 3. Evaluar Puntos de Control y Estado de Misión
+            val hasHumanCheckpoint = structuredContents.any { content ->
+                content is ChatContent.ActionChecklist && content.tasks.any { it.requiresHuman && !it.isCompleted }
+            }
+            val hasProposedActions = parsedActions.isNotEmpty()
+
+            if (_uiState.value.autoExecuteAgentActions && hasProposedActions) {
+                updateAgentMissionState(
+                    activeAgent.id,
+                    AgentState.Executing("Aplicando cambios automáticamente al espacio de trabajo...", 0.85f)
+                )
+                parsedActions.forEach { act -> executeAgentAction(act) }
+                updateAgentMissionState(
+                    activeAgent.id,
+                    AgentState.Verifying("Verificando diagnóstico y sintaxis...")
+                )
+                delay(300)
+                updateAgentMissionState(activeAgent.id, AgentState.Idle)
+            } else if (hasHumanCheckpoint || hasProposedActions) {
+                updateAgentMissionState(
+                    activeAgent.id,
+                    AgentState.WaitingForUser("Revisión de cambios requerida por el usuario", canResume = true)
+                )
+            } else {
+                updateAgentMissionState(
+                    activeAgent.id,
+                    AgentState.Verifying("Verificando sintaxis del código generado...")
+                )
+                delay(300)
+                updateAgentMissionState(activeAgent.id, AgentState.Idle)
             }
         }
     }
@@ -861,7 +937,86 @@ class IdeViewModel : ViewModel() {
     }
 
     fun resumeAgentMission(agentId: String) {
-        updateAgentMissionState(agentId, AgentState.Executing("Reanudando ejecución colaborativa...", 0.75f))
+        viewModelScope.launch {
+            updateAgentMissionState(agentId, AgentState.Executing("Reanudando ejecución colaborativa...", 0.75f))
+
+            // 1. Ejecutar acciones propuestas pendientes
+            val pendingActions = _uiState.value.chatMessages
+                .flatMap { it.actions }
+                .filter { it.status == ActionStatus.PROPOSED }
+
+            if (pendingActions.isNotEmpty()) {
+                pendingActions.forEach { act ->
+                    executeAgentAction(act)
+                    delay(150)
+                }
+            }
+
+            // 2. Marcar las tareas de checklist como completadas
+            _uiState.update { state ->
+                val updatedMsgs = state.chatMessages.map { msg ->
+                    val updatedContents = msg.contents.map { content ->
+                        if (content is ChatContent.ActionChecklist) {
+                            content.copy(tasks = content.tasks.map { it.copy(isCompleted = true) })
+                        } else content
+                    }
+                    msg.copy(contents = updatedContents)
+                }
+                state.copy(chatMessages = updatedMsgs)
+            }
+
+            updateAgentMissionState(agentId, AgentState.Verifying("Verificando consistencia del proyecto..."))
+            delay(400)
+            updateAgentMissionState(agentId, AgentState.Idle)
+        }
+    }
+
+    fun applyArtifactCodeToProject(code: String, targetFilePath: String? = null) {
+        val root = _uiState.value.rootProject
+        val targetPath = targetFilePath?.trim() ?: _uiState.value.activeFile.path
+        val fileName = targetPath.substringAfterLast("/").ifBlank { "componente.kt" }
+
+        // Buscar si el archivo existe en el proyecto
+        val existingFile = root.flatten().firstOrNull { it.path == targetPath || it.name == fileName }
+        if (existingFile != null) {
+            existingFile.content = code
+            if (_uiState.value.activeFile.id == existingFile.id || _uiState.value.activeFile.path == existingFile.path) {
+                onEditorChange(TextFieldValue(code, selection = TextRange(0)), isImmediate = true)
+            }
+        } else {
+            val parentPath = if (targetPath.contains("/")) targetPath.substringBeforeLast("/") else "/mi_nuevo_proyecto/lib"
+            createNewFile(fileName, parentPath)
+            _uiState.value.activeFile.content = code
+            onEditorChange(TextFieldValue(code, selection = TextRange(0)), isImmediate = true)
+        }
+
+        updateAgentMissionState(
+            _uiState.value.activeAgent.id,
+            AgentState.Verifying("Verificando consistencia de código inyectado...")
+        )
+        viewModelScope.launch {
+            delay(400)
+            updateAgentMissionState(_uiState.value.activeAgent.id, AgentState.Idle)
+        }
+    }
+
+    fun toggleChecklistTask(messageId: String, taskId: String) {
+        _uiState.update { state ->
+            val updated = state.chatMessages.map { msg ->
+                if (msg.id == messageId) {
+                    val newContents = msg.contents.map { content ->
+                        if (content is ChatContent.ActionChecklist) {
+                            val newTasks = content.tasks.map { t ->
+                                if (t.id == taskId) t.copy(isCompleted = !t.isCompleted) else t
+                            }
+                            content.copy(tasks = newTasks)
+                        } else content
+                    }
+                    msg.copy(contents = newContents)
+                } else msg
+            }
+            state.copy(chatMessages = updated)
+        }
     }
 
     fun runProject() {

@@ -201,4 +201,49 @@ class AntigravityAgentAndChatTest {
         assertFalse(message.isFromUser)
         assertEquals("Gemini Flash Copilot", message.senderName)
     }
+
+    @Test
+    fun testAntigravityArtifactParserFullLoop() {
+        val rawAiResponse = """
+            # Plan: Sistema de Autenticación Firebase
+            Diseñar e implementar el repositorio de login y la pantalla de inicio de sesión.
+            
+            ## Checklist de Tareas
+            - [x] Crear repositorio de auth
+            - [ ] [HUMANO] Configurar credenciales google-services.json
+            - [ ] Inyectar dependencias en ViewModel
+            
+            ```kotlin
+            // File: lib/auth_service.dart
+            class AuthService {
+                void login() => print("Login");
+            }
+            ```
+            
+            ```bash
+            flutter pub add firebase_auth
+            ```
+        """.trimIndent()
+
+        val parsed = AntigravityArtifactParser.parseResponse(rawAiResponse)
+        assertTrue(parsed.any { it is ChatContent.PlanArtifact })
+        val plan = parsed.filterIsInstance<ChatContent.PlanArtifact>().first()
+        assertEquals("Sistema de Autenticación Firebase", plan.title)
+
+        assertTrue(parsed.any { it is ChatContent.ActionChecklist })
+        val checklist = parsed.filterIsInstance<ChatContent.ActionChecklist>().first()
+        assertEquals(3, checklist.tasks.size)
+        assertTrue(checklist.tasks[0].isCompleted)
+        assertTrue(checklist.tasks[1].requiresHuman)
+        assertFalse(checklist.tasks[2].requiresHuman)
+
+        assertTrue(parsed.any { it is ChatContent.CodeBlock })
+        val codeBlock = parsed.filterIsInstance<ChatContent.CodeBlock>().first()
+        assertEquals("lib/auth_service.dart", codeBlock.targetFilePath)
+
+        assertTrue(parsed.any { it is ChatContent.ActionCard })
+        val actionCard = parsed.filterIsInstance<ChatContent.ActionCard>().first()
+        assertEquals(AgentActionType.RUN_COMMAND, actionCard.action.type)
+        assertEquals("flutter pub add firebase_auth", actionCard.action.payload)
+    }
 }

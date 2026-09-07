@@ -246,6 +246,23 @@ fun IdeMainScreen(
                                 viewModel.selectNavTab(MainNavTab.EDITOR)
                                 coroutineScope.launch { snackbarHostState.showSnackbar("Código inyectado en el editor") }
                             },
+                            onApplyCodeWithTarget = { code, targetPath ->
+                                viewModel.applyArtifactCodeToProject(code, targetPath)
+                                viewModel.selectNavTab(MainNavTab.EDITOR)
+                                coroutineScope.launch {
+                                    val destination = targetPath ?: "archivo activo"
+                                    snackbarHostState.showSnackbar("✓ Código aplicado a $destination")
+                                }
+                            },
+                            onToggleTask = { msgId, taskId ->
+                                viewModel.toggleChecklistTask(msgId, taskId)
+                            },
+                            onProceedPlan = {
+                                viewModel.resumeAgentMission(uiState.activeAgent.id)
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("▶ Antigravity: Ejecutando plan y acciones aprobadas...")
+                                }
+                            },
                             onClose = { viewModel.selectNavTab(MainNavTab.EDITOR) },
                             onOpenMissionControl = { viewModel.selectNavTab(MainNavTab.MISSION_CONTROL) },
                             modifier = Modifier.fillMaxSize()

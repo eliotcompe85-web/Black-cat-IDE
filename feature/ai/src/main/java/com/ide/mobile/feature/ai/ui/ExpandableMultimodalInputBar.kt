@@ -5,6 +5,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,7 +23,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 
 private const val IMAGE_MIME_TYPE = "image/*"
@@ -100,6 +103,63 @@ fun ExpandableMultimodalInputBar(
                 }
             }
 
+            // 1.5 Fila de Comandos Rápidos Slash (Antigravity & Kiro) y Modo Agéntico
+            var isPlanningMode by remember { mutableStateOf(true) }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState())
+                    .padding(bottom = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Selector de Modo: Planning vs Fast
+                Surface(
+                    color = if (isPlanningMode) Color(0xFF26193E) else Color(0xFF1E293B),
+                    shape = RoundedCornerShape(12.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, if (isPlanningMode) Color(0xFFC084FC) else Color(0xFF475569)),
+                    modifier = Modifier.clickable { isPlanningMode = !isPlanningMode }
+                ) {
+                    Text(
+                        text = if (isPlanningMode) "🛠️ Planning Mode" else "⚡ Fast Mode",
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isPlanningMode) Color(0xFFE9D5FF) else Color(0xFF94A3B8),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                    )
+                }
+
+                // Chips de Slash Commands Antigravity
+                val slashCommands = listOf(
+                    "/plan" to "📋 /plan",
+                    "/review" to "🔍 /review",
+                    "/fix" to "🛠️ /fix",
+                    "/test" to "🧪 /test",
+                    "/run" to "▶️ /run",
+                    "/diff" to "📑 /diff",
+                    "/clear" to "🧹 /clear"
+                )
+
+                slashCommands.forEach { (cmd, label) ->
+                    Surface(
+                        color = Color(0xFF161826),
+                        shape = RoundedCornerShape(12.dp),
+                        border = androidx.compose.foundation.BorderStroke(0.5.dp, Color(0xFF2E334D)),
+                        modifier = Modifier.clickable {
+                            textState = if (textState.isBlank()) "$cmd " else "$cmd $textState"
+                        }
+                    ) {
+                        Text(
+                            text = label,
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8),
+                            fontWeight = FontWeight.Medium,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                        )
+                    }
+                }
+            }
+
             // 2. Barra de Entrada de Texto Dinámica y Controles
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -160,7 +220,12 @@ fun ExpandableMultimodalInputBar(
                 FloatingActionButton(
                     onClick = {
                         if (isEnabled) {
-                            onSendMessage(textState, attachedUris)
+                            val promptToSend = if (isPlanningMode && !textState.startsWith("/")) {
+                                "/plan $textState"
+                            } else {
+                                textState
+                            }
+                            onSendMessage(promptToSend, attachedUris)
                             textState = ""
                             attachedUris = emptyList() // Limpiar tras enviar
                         }

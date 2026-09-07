@@ -33,11 +33,18 @@ class ClaudeAssistantProvider(
         config: GenerationConfig
     ): Flow<String> = flow {
         val userPrompt = buildString {
-            append("Actúa como el asistente de desarrollo móvil Antigravity de Black Cat IDE.\n")
+            append("Actúa como el Agente Autónomo de Ingeniería de Software de Black Cat IDE (arquitectura Google Antigravity y AWS Kiro).\n")
+            append("REGLAS DE FORMATO OBLIGATORIAS:\n")
+            append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' y un breve resumen del enfoque.\n")
+            append("2. CHECKLIST: Incluye '## Checklist de Tareas' con viñetas:\n")
+            append("   - [ ] <Tarea técnica concreta>\n")
+            append("   - [ ] [HUMANO] <Paso que requiere confirmación del usuario>\n")
+            append("3. ARCHIVOS: En cada bloque de código pon la ruta en la primera línea: // File: ruta/nombre_del_archivo.kt\n")
+            append("4. COMANDOS: Pon comandos en bloques ```bash ... ```.\n\n")
             append("Archivo: ${context.filePath} (Línea ${context.currentLine})\n\n")
             if (context.fullText.isNotBlank()) {
-                append("```dart/kotlin\n")
-                append(context.fullText.take(2500))
+                append("```\n")
+                append(context.fullText.take(3000))
                 append("\n```\n\n")
             }
             append("Instrucción: $prompt\n")

@@ -110,22 +110,55 @@ data class ChatMessage(
             if (contents.isNotEmpty()) return contents
             val result = mutableListOf<ChatContent>()
             if (text.isNotBlank()) {
+                var remaining = text
+
+                // 1. Extraer Plan si existe
+                val planRegex = Regex("(?:^|\\n)(?:#|##)\\s*Plan:?\\s*([^\\n]+)\\n([\\s\\S]*?)(?=(?:\\n(?:#|##)|```|\\n-\\s*\\[|$))", RegexOption.IGNORE_CASE)
+                val planMatch = planRegex.find(remaining)
+                if (planMatch != null) {
+                    val title = planMatch.groupValues[1].trim()
+                    val summary = planMatch.groupValues[2].trim()
+                    if (title.isNotBlank() || summary.isNotBlank()) {
+                        result.add(ChatContent.PlanArtifact(title.ifBlank { "Plan de Implementación" }, summary))
+                        remaining = remaining.replace(planMatch.value, "\n")
+                    }
+                }
+
+                // 2. Extraer Checklist de Tareas si existe
+                val taskItemRegex = Regex("[-*]\\s*\\[([ xX])\\]\\s*([^\\n]+)")
+                val taskMatches = taskItemRegex.findAll(remaining).toList()
+                if (taskMatches.isNotEmpty()) {
+                    val tasks = taskMatches.map { match ->
+                        val isChecked = match.groupValues[1].equals("x", ignoreCase = true)
+                        val desc = match.groupValues[2].trim()
+                        val reqHuman = desc.contains("[HUMANO]", ignoreCase = true) || desc.contains("[HUMAN]", ignoreCase = true)
+                        val cleanDesc = desc.replace("\\[HUMANO\\]".toRegex(RegexOption.IGNORE_CASE), "").trim()
+                        ChecklistTask(description = cleanDesc, isCompleted = isChecked, requiresHuman = reqHuman)
+                    }
+                    result.add(ChatContent.ActionChecklist(title = "Checklist de Tareas del Agente", tasks = tasks))
+                    taskMatches.forEach { remaining = remaining.replace(it.value, "") }
+                }
+
+                // 3. Extraer Bloques de Código con rutas
                 val codeBlockRegex = "```([a-zA-Z0-9_\\-]*)\\n([\\s\\S]*?)```".toRegex()
+                val fileHeaderRegex = Regex("^(?:\\/\\/|#|\\/\\*)\\s*(?:File|Archivo|Ruta):?\\s*([a-zA-Z0-9_./-]+)", RegexOption.IGNORE_CASE)
                 var lastIndex = 0
-                for (match in codeBlockRegex.findAll(text)) {
-                    val preText = text.substring(lastIndex, match.range.first).trim()
+                for (match in codeBlockRegex.findAll(remaining)) {
+                    val preText = remaining.substring(lastIndex, match.range.first).trim()
                     if (preText.isNotEmpty()) {
                         result.add(ChatContent.Text(preText))
                     }
                     val lang = match.groupValues[1].ifBlank { "kotlin" }
                     val code = match.groupValues[2].trimEnd()
-                    result.add(ChatContent.CodeBlock(code = code, language = lang))
+                    val firstLine = code.lines().firstOrNull()?.trim() ?: ""
+                    val filePath = fileHeaderRegex.find(firstLine)?.groupValues?.getOrNull(1)?.trim()
+                    result.add(ChatContent.CodeBlock(code = code, language = lang, targetFilePath = filePath))
                     lastIndex = match.range.last + 1
                 }
-                if (lastIndex < text.length) {
-                    val remaining = text.substring(lastIndex).trim()
-                    if (remaining.isNotEmpty()) {
-                        result.add(ChatContent.Text(remaining))
+                if (lastIndex < remaining.length) {
+                    val remText = remaining.substring(lastIndex).trim()
+                    if (remText.isNotEmpty()) {
+                        result.add(ChatContent.Text(remText))
                     }
                 }
             }

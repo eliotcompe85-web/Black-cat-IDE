@@ -52,17 +52,24 @@ class GeminiAssistantProvider(
         config: GenerationConfig
     ): Flow<String> = flow {
         val enrichedPrompt = buildString {
-            append("Actúa como un asistente senior de desarrollo móvil en Black Cat IDE (Flutter, Jetpack Compose, Kotlin, Dart).\n")
+            append("Actúa como el Agente Autónomo de Ingeniería de Software de Black Cat IDE (arquitectura Google Antigravity y AWS Kiro).\n")
+            append("Tu objetivo es resolver la tarea del usuario planificando, generando tareas interactivas, código listo para inyectar y comandos.\n\n")
+            append("REGLAS DE FORMATO OBLIGATORIAS (PROTOCOLO ANTIGRAVITY & KIRO):\n")
+            append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' seguido de 2 o 3 líneas resumiendo el enfoque técnico.\n")
+            append("2. CHECKLIST: Incluye '## Checklist de Tareas' con viñetas en formato Markdown:\n")
+            append("   - [ ] <Tarea técnica concreta>\n")
+            append("   - [ ] [HUMANO] <Paso que requiere confirmación o prueba por parte del usuario>\n")
+            append("3. ARCHIVOS Y CÓDIGO: En cada bloque de código, pon SIEMPRE en la primera línea la ruta de destino:\n")
+            append("   // File: ruta/nombre_del_archivo.kt (o .dart, .js, .py)\n")
+            append("4. COMANDOS DE TERMINAL: Todo comando a ejecutar (git, npm, flutter, mkdir) debe ir en bloques ```bash ... ```.\n\n")
             append("Archivo activo: ${context.filePath} (línea ${context.currentLine})\n")
             append("Instrucción del usuario: $prompt\n\n")
             if (context.fullText.isNotBlank()) {
                 append("--- CÓDIGO ACTUAL ---\n")
-                append(context.fullText.take(2500))
+                append(context.fullText.take(3000))
                 append("\n--- FIN CÓDIGO ---\n\n")
             }
-            append("Si sugieres comandos de terminal (ej. flutter pub add, git, mkdir), colócalos en bloques ```bash ... ```.\n")
-            append("Si sugieres crear o modificar archivos, especifica el nombre en un comentario como // File: ruta/nombre.dart.\n")
-            append("Responde en español de forma clara, directa y estructurada para smartphones.")
+            append("Responde en español de forma profesional, estructurada y ejecutable.")
         }
 
         val resultText = try {

@@ -53,6 +53,9 @@ fun AiAssistantPanel(
     onRejectAction: (AgentAction) -> Unit = {},
     onClearChat: () -> Unit = {},
     onInsertCode: (String) -> Unit = {},
+    onApplyCodeWithTarget: ((String, String?) -> Unit)? = null,
+    onToggleTask: ((String, String) -> Unit)? = null,
+    onProceedPlan: (() -> Unit)? = null,
     onClose: () -> Unit = {},
     onOpenMissionControl: (() -> Unit)? = null,
     modifier: Modifier = Modifier
@@ -412,7 +415,10 @@ fun AiAssistantPanel(
                             onApproveAction = onExecuteAction,
                             onRejectAction = onRejectAction,
                             onViewInTerminal = onViewInTerminal,
-                            onApplyCode = onInsertCode
+                            onApplyCode = onInsertCode,
+                            onApplyCodeWithTarget = onApplyCodeWithTarget,
+                            onToggleTask = onToggleTask,
+                            onProceedPlan = onProceedPlan
                         )
                     }
                 }

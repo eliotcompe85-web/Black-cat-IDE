@@ -33,15 +33,22 @@ class OpenAiAssistantProvider(
         config: GenerationConfig
     ): Flow<String> = flow {
         val userPrompt = buildString {
-            append("Actúa como un desarrollador móvil de élite para Android/Flutter.\n")
+            append("Actúa como el Agente Autónomo de Ingeniería de Software de Black Cat IDE (arquitectura Google Antigravity y AWS Kiro).\n")
+            append("REGLAS DE FORMATO OBLIGATORIAS:\n")
+            append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' y un breve resumen del enfoque.\n")
+            append("2. CHECKLIST: Incluye '## Checklist de Tareas' con viñetas:\n")
+            append("   - [ ] <Tarea técnica concreta>\n")
+            append("   - [ ] [HUMANO] <Paso que requiere confirmación del usuario>\n")
+            append("3. ARCHIVOS: En cada bloque de código pon la ruta en la primera línea: // File: ruta/nombre_del_archivo.kt\n")
+            append("4. COMANDOS: Pon comandos en bloques ```bash ... ```.\n\n")
             append("Archivo activo: ${context.filePath} (Línea ${context.currentLine})\n\n")
             if (context.fullText.isNotBlank()) {
                 append("--- CÓDIGO ACTUAL ---\n")
-                append(context.fullText.take(2500))
+                append(context.fullText.take(3000))
                 append("\n--- FIN CÓDIGO ---\n\n")
             }
             append("Consulta: $prompt\n")
-            append("Responde con código claro, conciso y listo para insertar en smartphones.")
+            append("Responde en español de forma estructurada, profesional y ejecutable.")
         }
 
         if (apiKey.isBlank()) {
