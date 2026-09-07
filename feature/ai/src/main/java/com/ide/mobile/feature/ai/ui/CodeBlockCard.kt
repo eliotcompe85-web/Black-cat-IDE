@@ -141,13 +141,37 @@ fun CodeBlockCard(
                     .horizontalScroll(rememberScrollState())
                     .padding(12.dp)
             ) {
-                Text(
-                    text = code,
-                    color = Color(0xFFE2E8F0),
-                    fontSize = 12.sp,
-                    fontFamily = FontFamily.Monospace,
-                    lineHeight = 18.sp
-                )
+                if (langTag == "DIFF" || code.lines().any { it.startsWith("+++") || it.startsWith("---") }) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        code.lines().forEach { line ->
+                            val (bgColor, textColor) = when {
+                                line.startsWith("+") -> Color(0x2610B981) to Color(0xFF34D399)
+                                line.startsWith("-") -> Color(0x26EF4444) to Color(0xFFF87171)
+                                line.startsWith("@@") -> Color(0x2638BDF8) to Color(0xFF38BDF8)
+                                else -> Color.Transparent to Color(0xFFCBD5E1)
+                            }
+                            Text(
+                                text = line,
+                                color = textColor,
+                                fontSize = 12.sp,
+                                fontFamily = FontFamily.Monospace,
+                                lineHeight = 18.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(bgColor)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp)
+                            )
+                        }
+                    }
+                } else {
+                    Text(
+                        text = code,
+                        color = Color(0xFFE2E8F0),
+                        fontSize = 12.sp,
+                        fontFamily = FontFamily.Monospace,
+                        lineHeight = 18.sp
+                    )
+                }
             }
         }
     }

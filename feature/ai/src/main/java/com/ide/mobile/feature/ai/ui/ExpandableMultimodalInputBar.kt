@@ -134,9 +134,12 @@ fun ExpandableMultimodalInputBar(
                     "/plan" to "📋 /plan",
                     "/review" to "🔍 /review",
                     "/fix" to "🛠️ /fix",
+                    "/grill-me" to "🎙️ /grill-me",
                     "/test" to "🧪 /test",
                     "/run" to "▶️ /run",
                     "/diff" to "📑 /diff",
+                    "/goal" to "🎯 /goal",
+                    "/learn" to "🧠 /learn",
                     "/clear" to "🧹 /clear"
                 )
 

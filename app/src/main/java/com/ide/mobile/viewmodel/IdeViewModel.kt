@@ -719,6 +719,12 @@ class IdeViewModel : ViewModel() {
                 "Analiza y corrige los errores sintácticos o de compilación en el archivo actual, proporcionando el bloque de código corregido: " + cleanPrompt.removePrefix("/fix").trim()
             cleanPrompt.startsWith("/diff", ignoreCase = true) ->
                 "Explica las diferencias y cambios propuestos para el archivo actual: " + cleanPrompt.removePrefix("/diff").trim()
+            cleanPrompt.startsWith("/grill-me", ignoreCase = true) ->
+                "Actúa como un arquitecto senior en modo /grill-me. Realiza una entrevista técnica con preguntas y opciones críticas para resolver decisiones de diseño antes de programar: " + cleanPrompt.removePrefix("/grill-me").trim()
+            cleanPrompt.startsWith("/goal", ignoreCase = true) ->
+                "Establece un objetivo autónomo de alto nivel desglosado en metas ejecutables y checkpoints de verificación: " + cleanPrompt.removePrefix("/goal").trim()
+            cleanPrompt.startsWith("/learn", ignoreCase = true) ->
+                "Aprende y documenta este patrón o corrección como regla persistente del proyecto: " + cleanPrompt.removePrefix("/learn").trim()
             else -> cleanPrompt
         }
 
