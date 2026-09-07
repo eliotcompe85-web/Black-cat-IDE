@@ -15,6 +15,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.ide.mobile.core.model.ChatContent
 
 @Composable
@@ -101,72 +102,99 @@ fun CodeBlockArtifactCard(
 ) {
     val clipboardManager = LocalClipboardManager.current
     var copied by remember { mutableStateOf(false) }
+    val targetPath = content.targetFilePath ?: "archivo_generado.kt"
+    val fileName = targetPath.substringAfterLast("/").ifBlank { targetPath }
 
     Card(
         shape = RoundedCornerShape(12.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF0F111E)),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFF2B314C)),
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp)
+            .padding(vertical = 6.dp)
     ) {
         Column {
-            // Cabecera del bloque de código
+            // Cabecera superior con información clara del archivo
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                    .background(Color(0xFF1E2238))
+                    .padding(horizontal = 12.dp, vertical = 10.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = content.targetFilePath ?: content.language,
-                    style = MaterialTheme.typography.labelMedium,
-                    fontFamily = FontFamily.Monospace,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    // Botón de Copiar
-                    IconButton(
-                        onClick = {
-                            clipboardManager.setText(AnnotatedString(content.code))
-                            copied = true
-                        },
-                        modifier = Modifier.size(24.dp)
-                    ) {
-                        Icon(
-                            imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
-                            contentDescription = if (copied) "Copiado" else "Copiar",
-                            tint = if (copied) Color(0xFF10B981) else MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(16.dp)
+                    Icon(
+                        imageVector = Icons.Default.Description,
+                        contentDescription = null,
+                        tint = Color(0xFF38BDF8),
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Column {
+                        Text(
+                            text = "Archivo a crear o actualizar:",
+                            fontSize = 10.sp,
+                            color = Color(0xFF94A3B8)
+                        )
+                        Text(
+                            text = fileName,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White
                         )
                     }
+                }
 
-                    // Si el agente identificó el archivo destino, mostrar botón de Aplicar
-                    val targetPath = content.targetFilePath
-                    if (targetPath != null) {
-                        Spacer(modifier = Modifier.width(8.dp))
-                        FilledTonalButton(
-                            onClick = { onApplyToWorkspace(content.code, targetPath) },
-                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                            modifier = Modifier.height(24.dp)
-                        ) {
-                            Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(14.dp))
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text("Aplicar", style = MaterialTheme.typography.labelSmall)
-                        }
-                    }
+                // Botón de Copiar
+                IconButton(
+                    onClick = {
+                        clipboardManager.setText(AnnotatedString(content.code))
+                        copied = true
+                    },
+                    modifier = Modifier.size(28.dp)
+                ) {
+                    Icon(
+                        imageVector = if (copied) Icons.Default.Check else Icons.Default.ContentCopy,
+                        contentDescription = if (copied) "Copiado" else "Copiar",
+                        tint = if (copied) Color(0xFF10B981) else Color(0xFF94A3B8),
+                        modifier = Modifier.size(16.dp)
+                    )
                 }
             }
 
-            // Cuerpo del código
+            // Barra de acción prominente para que cualquier persona guarde el código con 1 toque
+            Surface(
+                color = Color(0xFF161828),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)
+            ) {
+                Button(
+                    onClick = { onApplyToWorkspace(content.code, targetPath) },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = Color(0xFF7C3AED),
+                        contentColor = Color.White
+                    ),
+                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier.fillMaxWidth().height(38.dp)
+                ) {
+                    Icon(Icons.Default.SaveAlt, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "✨ Guardar y Escribir en $fileName",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+
+            // Vista previa del código
             Text(
                 text = content.code,
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = FontFamily.Monospace,
-                color = MaterialTheme.colorScheme.onSurface,
-                modifier = Modifier.padding(12.dp)
+                color = Color(0xFFE2E8F0),
+                modifier = Modifier
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
             )
         }
     }

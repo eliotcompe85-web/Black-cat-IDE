@@ -243,66 +243,12 @@ class LocalAgentEngine {
         query: String,
         context: CodeContext
     ): Flow<String> = flow {
-        emit("🐱 **[${agent.icon} ${agent.name}]** activado estilo Antigravity...\n")
-        emit("📋 **Habilidades activas:** ${agent.skills.joinToString(", ") { "`$it`" }}\n\n")
-
-        val promptLower = query.lowercase()
-        when {
-            promptLower.contains("carpeta") || promptLower.contains("directorio") || promptLower.contains("folder") -> {
-                val folderName = if (promptLower.contains("services")) "services" else if (promptLower.contains("models")) "models" else "components"
-                emit("⚙️ **Paso:** Analizando estructura de directorios...\n\n")
-                emit("He preparado la creación de la carpeta `$folderName` dentro del proyecto.\n\n")
-                emit("```bash\nmkdir -p lib/$folderName\n```\n\n")
-                emit("💡 *Puedes aprobar la ejecución del comando abajo para que se cree inmediatamente en tu proyecto.*")
-            }
-            promptLower.contains("instalar") || promptLower.contains("dependencia") || promptLower.contains("paquete") -> {
-                val pkg = if (promptLower.contains("http")) "http" else if (promptLower.contains("provider")) "provider" else "shared_preferences"
-                emit("⚙️ **Paso:** Verificando compatibilidad de la librería `$pkg`...\n\n")
-                emit("Comando preparado para ejecutar en la terminal de Black Cat IDE:\n\n")
-                emit("```bash\nflutter pub add $pkg\n```\n\n")
-                emit("💡 *Usa 'Aprobar y Ejecutar' en la tarjeta para correrlo en la terminal.*")
-            }
-            promptLower.contains("explicar") || promptLower.contains("explain") -> {
-                emit("### 🔍 Análisis de Código (${context.filePath})\n\n")
-                emit("El archivo activo define la interfaz principal utilizando **StatelessWidget** y el sistema de temas Material 3.\n")
-                emit("- **Punto clave:** La función `build` retorna un widget desacoplado optimizado para smartphone.\n")
-                emit("- **Rendimiento:** Evita cálculos pesados en el hilo UI.\n")
-            }
-            promptLower.contains("generar") || promptLower.contains("crear") || promptLower.contains("generate") -> {
-                emit("### 🪄 Código Generado por ${agent.name}:\n\n")
-                emit("```dart\n")
-                emit("// File: lib/components/custom_card.dart\n")
-                emit("import 'package:flutter/material.dart';\n\n")
-                emit("class CustomActionCard extends StatelessWidget {\n")
-                emit("  final String title;\n")
-                emit("  final VoidCallback onTap;\n\n")
-                emit("  const CustomActionCard({super.key, required this.title, required this.onTap});\n\n")
-                emit("  @override\n")
-                emit("  Widget build(BuildContext context) {\n")
-                emit("    return Card(\n")
-                emit("      color: const Color(0xFF191B2E),\n")
-                emit("      shape: RoundedCornerShape(12),\n")
-                emit("      child: ListTile(\n")
-                emit("        title: Text(title, style: const TextStyle(color: Colors.white)),\n")
-                emit("        trailing: const Icon(Icons.arrow_forward_ios, color: Color(0xFF7B61FF), size: 14),\n")
-                emit("        onTap: onTap,\n")
-                emit("      ),\n")
-                emit("    );\n")
-                emit("  }\n")
-                emit("}\n")
-                emit("```\n\n")
-                emit("💡 *Puedes insertar este código directamente en tu archivo o usar la acción de crear archivo.*")
-            }
-            promptLower.contains("git") || promptLower.contains("terminal") -> {
-                emit("### 🖥️ Diagnóstico de Terminal y Git:\n\n")
-                emit("```bash\ngit status\n```\n\n")
-                emit("Revisa las modificaciones actuales en el árbol de trabajo.")
-            }
-            else -> {
-                emit("### 💡 Respuesta de ${agent.name}:\n\n")
-                emit("He procesado tu consulta considerando el contexto de `${context.filePath}` (línea ${context.currentLine}).\n\n")
-                emit("Para mantener un desarrollo fluido en tu dispositivo móvil, puedes pedirme que cree carpetas, instale paquetes, ejecute comandos o audite fallos de sintaxis.\n")
-            }
+        emit("🐱 **[${agent.icon} ${agent.name}]** activado...\n\n")
+        val synthesized = SmartAgentSynthesizer.synthesizeResponse(query, context)
+        val words = synthesized.split(Regex("(?<=\\s)|(?=\\n)"))
+        for (word in words) {
+            emit(word)
+            delay(10)
         }
     }
 }

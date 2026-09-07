@@ -9,7 +9,8 @@ enum class ProviderType(val displayName: String, val badge: String) {
     CLAUDE_API("Anthropic Claude", "🎭 Cloud"),
     PERPLEXITY_API("Perplexity AI", "🔍 Web / Docs"),
     LOCAL_GGUF("Local LM (llama.cpp)", "📱 On-Device"),
-    LITERT_LM("Google LiteRT-LM", "⚡ NPU/GPU")
+    LITERT_LM("Google LiteRT-LM", "⚡ NPU/GPU"),
+    OLLAMA("Ollama Local Engine", "🦙 Ollama")
 }
 
 

@@ -365,39 +365,59 @@ fun AiAssistantPanel(
                         lineHeight = 16.sp
                     )
 
-                    Spacer(modifier = Modifier.height(20.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = "Sugerencias de inicio rápido:",
+                        text = "✨ ¿Qué deseas crear hoy?",
                         color = Color(0xFFC084FC),
-                        fontSize = 11.sp,
+                        fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
-
-                    val quickPrompts = listOf(
-                        "📁 Crea la carpeta components y un archivo custom_card.dart",
-                        "📦 Instala el paquete http y genera una solicitud GET",
-                        "🖥️ Ejecuta git status y revisa los archivos modificados",
-                        "🪄 Genera un widget Flutter con animación a 60 FPS",
-                        "🪲 Audita el código activo en busca de fallas o balance de llaves"
+                    Text(
+                        text = "Toca una opción o escribe abajo con tus propias palabras:",
+                        color = Color(0xFF94A3B8),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(bottom = 8.dp)
                     )
 
-                    quickPrompts.forEach { prompt ->
+                    val starterCards = listOf(
+                        Triple("📱", "Crear una App de Tareas", "Crea una app completa de lista de tareas con opciones para agregar, marcar y eliminar tareas"),
+                        Triple("🎨", "Diseñar Pantalla de Login", "Diseña una pantalla de inicio de sesión moderna con correo, contraseña y botón animado"),
+                        Triple("🧮", "Crear una Calculadora Táctil", "Crea el código de una calculadora funcional con diseño limpio y botones interactivos"),
+                        Triple("👤", "Diseñar Perfil de Usuario", "Crea una pantalla de perfil de usuario con foto circular, biografía y botones"),
+                        Triple("🔍", "Explicar mi Código en Español", "Explícame con palabras sencillas y paso a paso qué hace el código de mi archivo actual")
+                    )
+
+                    starterCards.forEach { (emoji, title, promptText) ->
                         Surface(
                             color = Color(0xFF141522),
-                            shape = RoundedCornerShape(8.dp),
-                            border = BorderStroke(0.8.dp, Color(0xFF24263A)),
+                            shape = RoundedCornerShape(10.dp),
+                            border = BorderStroke(1.dp, Color(0xFF262A42)),
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 3.dp)
-                                .clickable { onSendMessage(prompt) }
+                                .clickable { onSendMessage(promptText) }
                         ) {
-                            Text(
-                                text = prompt,
-                                color = Color(0xFFCBD5E1),
-                                fontSize = 11.sp,
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp)
-                            )
+                            Row(
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(text = emoji, fontSize = 20.sp)
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column {
+                                    Text(
+                                        text = title,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = promptText,
+                                        color = Color(0xFF94A3B8),
+                                        fontSize = 10.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
                     }
                 }

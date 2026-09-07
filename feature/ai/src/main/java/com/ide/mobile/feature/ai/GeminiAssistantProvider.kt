@@ -85,11 +85,12 @@ class GeminiAssistantProvider(
                 delay(18) // Efecto streaming fluido
             }
         } else {
-            // Motor heurístico local sin tope de acceso si la red no está disponible
-            val fallbackChunks = generateLocalContinuousResponse(prompt, context)
-            for (chunk in fallbackChunks) {
-                emit(chunk)
-                delay(35)
+            // Motor inteligente local autónomo: responde a cualquier pregunta o instrucción del usuario
+            val synthesized = SmartAgentSynthesizer.synthesizeResponse(prompt, context)
+            val words = synthesized.split(Regex("(?<=\\s)|(?=\\n)"))
+            for (word in words) {
+                emit(word)
+                delay(12) // Efecto de escritura fluido
             }
         }
     }

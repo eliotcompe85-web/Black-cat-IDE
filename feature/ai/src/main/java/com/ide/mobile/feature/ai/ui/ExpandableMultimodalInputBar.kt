@@ -121,7 +121,7 @@ fun ExpandableMultimodalInputBar(
                     modifier = Modifier.clickable { isPlanningMode = !isPlanningMode }
                 ) {
                     Text(
-                        text = if (isPlanningMode) "🛠️ Planning Mode" else "⚡ Fast Mode",
+                        text = if (isPlanningMode) "🧙‍♂️ Modo Guiado (Paso a paso)" else "⚡ Modo Rápido (Directo)",
                         fontSize = 10.sp,
                         fontWeight = FontWeight.Bold,
                         color = if (isPlanningMode) Color(0xFFE9D5FF) else Color(0xFF94A3B8),
@@ -129,18 +129,17 @@ fun ExpandableMultimodalInputBar(
                     )
                 }
 
-                // Chips de Slash Commands Antigravity
+                // Chips de Comandos Fáciles
                 val slashCommands = listOf(
-                    "/plan" to "📋 /plan",
-                    "/review" to "🔍 /review",
-                    "/fix" to "🛠️ /fix",
-                    "/grill-me" to "🎙️ /grill-me",
-                    "/test" to "🧪 /test",
-                    "/run" to "▶️ /run",
-                    "/diff" to "📑 /diff",
-                    "/goal" to "🎯 /goal",
-                    "/learn" to "🧠 /learn",
-                    "/clear" to "🧹 /clear"
+                    "/plan" to "📋 Planificar",
+                    "/grill-me" to "🎙️ Entrevista guiada",
+                    "/fix" to "🛠️ Reparar errores",
+                    "/review" to "🔍 Explicar código",
+                    "/run" to "▶️ Probar app",
+                    "/diff" to "📑 Ver cambios",
+                    "/goal" to "🎯 Meta paso a paso",
+                    "/learn" to "🧠 Enseñar regla",
+                    "/clear" to "🧹 Nuevo chat"
                 )
 
                 slashCommands.forEach { (cmd, label) ->
@@ -155,7 +154,7 @@ fun ExpandableMultimodalInputBar(
                         Text(
                             text = label,
                             fontSize = 10.sp,
-                            color = Color(0xFF94A3B8),
+                            color = Color(0xFFCBD5E1),
                             fontWeight = FontWeight.Medium,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                         )
@@ -200,7 +199,7 @@ fun ExpandableMultimodalInputBar(
                 ) {
                     if (textState.isEmpty()) {
                         Text(
-                            text = "Pregúntale al agente o arrastra un diseño...",
+                            text = "Dile a la IA qué app o código deseas crear...",
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )

@@ -563,11 +563,62 @@ class IdeViewModel : ViewModel() {
             }
             cleanCmd == "help" -> {
                 newLogs.add("Comandos disponibles:")
+                newLogs.add("  ollama [cmd]      Motor local Ollama (run, list, pull, ps, serve)")
                 newLogs.add("  flutter run       Compila y ejecuta en emulador Pixel 6")
                 newLogs.add("  git status        Muestra estado del árbol de trabajo")
                 newLogs.add("  ls / dir          Lista los archivos del proyecto activo")
                 newLogs.add("  cat [archivo]     Muestra el contenido de un archivo")
                 newLogs.add("  clear             Limpia el buffer de la terminal")
+            }
+            cleanCmd.startsWith("ollama") -> {
+                when {
+                    cleanCmd == "ollama" || cleanCmd == "ollama --help" || cleanCmd == "ollama -h" -> {
+                        newLogs.add("Usage: ollama [command]")
+                        newLogs.add("")
+                        newLogs.add("Available Commands:")
+                        newLogs.add("  run <model>    Cargar y ejecutar modelo local (ej: ollama run qwen2.5-coder)")
+                        newLogs.add("  list / ls      Listar modelos locales descargados")
+                        newLogs.add("  pull <model>   Descargar un modelo al teléfono (ej: ollama pull llama3.2:1b)")
+                        newLogs.add("  ps             Ver modelos activos en memoria")
+                        newLogs.add("  serve          Iniciar servidor Ollama en puerto 11434")
+                    }
+                    cleanCmd == "ollama list" || cleanCmd == "ollama ls" -> {
+                        newLogs.add("NAME                  ID              SIZE      MODIFIED")
+                        newLogs.add("qwen2.5-coder:1.5b    0b40e53a3e6c    986 MB    2 hours ago")
+                        newLogs.add("llama3.2:1b           b3a987d6e4b1    1.3 GB    1 day ago")
+                        newLogs.add("deepseek-coder:1.3b   a7c85e2b489d    890 MB    3 days ago")
+                        newLogs.add("gemma2:2b             c1a4e28f78a2    1.6 GB    1 week ago")
+                    }
+                    cleanCmd == "ollama ps" -> {
+                        newLogs.add("NAME                  ID              SIZE      PROCESSOR    UNTIL")
+                        newLogs.add("qwen2.5-coder:1.5b    0b40e53a3e6c    986 MB    100% CPU     En memoria activa")
+                    }
+                    cleanCmd.startsWith("ollama run ") -> {
+                        val modelName = cleanCmd.removePrefix("ollama run ").trim()
+                        newLogs.add("pulling manifest for '$modelName'")
+                        newLogs.add("verifying sha256 digest")
+                        newLogs.add("writing manifest")
+                        newLogs.add("success: modelo '$modelName' cargado en memoria!")
+                        newLogs.add(">>> [Ollama] Conectado a $modelName. Listo para chatear en el Asistente IA.")
+                        _uiState.update { it.copy(selectedAiProvider = ProviderType.OLLAMA) }
+                    }
+                    cleanCmd.startsWith("ollama pull ") -> {
+                        val modelName = cleanCmd.removePrefix("ollama pull ").trim()
+                        newLogs.add("pulling manifest for $modelName...")
+                        newLogs.add("downloading layer 1/3: 100% [====================]")
+                        newLogs.add("downloading layer 2/3: 100% [====================]")
+                        newLogs.add("downloading layer 3/3: 100% [====================]")
+                        newLogs.add("verifying sha256 digest...")
+                        newLogs.add("success: modelo '$modelName' descargado y listo para 'ollama run $modelName'")
+                    }
+                    cleanCmd == "ollama serve" -> {
+                        newLogs.add("Ollama local engine listening on 127.0.0.1:11434 (API v1)")
+                        newLogs.add("Endpoints activos: /api/chat, /api/generate, /api/tags")
+                    }
+                    else -> {
+                        newLogs.add("ollama: comando desconocido. Ejecuta 'ollama --help'")
+                    }
+                }
             }
             cleanCmd.startsWith("flutter run") -> {
                 newLogs.add("Launching lib/main.dart on Pixel 6 in debug mode...")

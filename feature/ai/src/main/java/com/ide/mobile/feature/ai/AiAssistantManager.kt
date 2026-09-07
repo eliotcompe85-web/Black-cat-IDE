@@ -28,6 +28,7 @@ class AiAssistantManager(
     var claudeProvider = ClaudeAssistantProvider()
     var perplexityProvider = PerplexityAssistantProvider()
     val localLmProvider = LocalGgufAssistantProvider()
+    val ollamaProvider = OllamaAssistantProvider()
     val agentEngine = LocalAgentEngine()
 
     private var activeLocalAgent: LocalAgentEntity = LocalAgentEngine.BUILT_IN_AGENTS.first()
@@ -38,7 +39,8 @@ class AiAssistantManager(
         ProviderType.CLAUDE_API to claudeProvider,
         ProviderType.PERPLEXITY_API to perplexityProvider,
         ProviderType.LOCAL_GGUF to localLmProvider,
-        ProviderType.LITERT_LM to localLmProvider
+        ProviderType.LITERT_LM to localLmProvider,
+        ProviderType.OLLAMA to ollamaProvider
     )
 
     private val _currentProviderType = MutableStateFlow(initialProvider)
