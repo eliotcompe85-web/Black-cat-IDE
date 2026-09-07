@@ -44,11 +44,16 @@ fun ProjectLauncherScreen(
     onDeleteProject: (String) -> Unit,
     onToggleFavorite: (String) -> Unit,
     onDismiss: () -> Unit,
+    onNewProjectFromScratch: ((name: String, goal: String) -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
     var searchQuery by remember { mutableStateOf("") }
     var showImportDialog by remember { mutableStateOf(false) }
     var showCloneDialog by remember { mutableStateOf(false) }
+    var showAiCreatorDialog by remember { mutableStateOf(false) }
+
+    var aiProjectNameInput by remember { mutableStateOf("") }
+    var aiProjectGoalInput by remember { mutableStateOf("") }
 
     var importPathInput by remember { mutableStateOf("") }
     var importNameInput by remember { mutableStateOf("") }
@@ -142,6 +147,7 @@ fun ProjectLauncherScreen(
 
                     // Panel Derecho: Cuadrícula de Acciones (50%)
                     ActionsGridPanel(
+                        onOpenAiCreatorDialog = { showAiCreatorDialog = true },
                         onNewProjectFromTemplate = onNewProjectFromTemplate,
                         onOpenImportDialog = { showImportDialog = true },
                         onOpenCloneDialog = { showCloneDialog = true },
@@ -159,6 +165,7 @@ fun ProjectLauncherScreen(
                 ) {
                     // Acciones Rápidas Superiores
                     ActionsGridPanel(
+                        onOpenAiCreatorDialog = { showAiCreatorDialog = true },
                         onNewProjectFromTemplate = onNewProjectFromTemplate,
                         onOpenImportDialog = { showImportDialog = true },
                         onOpenCloneDialog = { showCloneDialog = true },
@@ -245,6 +252,97 @@ fun ProjectLauncherScreen(
             },
             dismissButton = {
                 TextButton(onClick = { showImportDialog = false }) {
+                    Text("Cancelar", color = Color(0xFF94A3B8))
+                }
+            }
+        )
+    }
+
+    // Modal: Asistente Senior para Crear Proyecto Paso a Paso
+    if (showAiCreatorDialog) {
+        AlertDialog(
+            onDismissRequest = { showAiCreatorDialog = false },
+            containerColor = Color(0xFF141728),
+            title = {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("🐱", fontSize = 24.sp)
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Column {
+                        Text(
+                            text = "Asistente Senior de Proyectos",
+                            color = Color.White,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Crear proyecto desde cero paso a paso",
+                            color = Color(0xFFC084FC),
+                            fontSize = 11.sp
+                        )
+                    }
+                }
+            },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Text(
+                        text = "¡Hola! Qué gusto saludarte. Cuéntame qué te gustaría construir hoy y juntos definiremos el nombre de tu proyecto y dejaremos listo tu nuevo espacio de trabajo.",
+                        color = Color(0xFFCBD5E1),
+                        fontSize = 12.sp,
+                        lineHeight = 16.sp
+                    )
+
+                    OutlinedTextField(
+                        value = aiProjectGoalInput,
+                        onValueChange = {
+                            aiProjectGoalInput = it
+                            if (aiProjectNameInput.isBlank() && it.isNotBlank()) {
+                                val firstWord = it.trim().split(" ").firstOrNull()?.replaceFirstChar { c -> c.uppercase() } ?: "MiApp"
+                                aiProjectNameInput = "${firstWord}App"
+                            }
+                        },
+                        label = { Text("¿Cuál es el objetivo o idea de tu proyecto?") },
+                        placeholder = { Text("Ej: Una app para registrar mis gastos diarios") },
+                        maxLines = 2,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFFC084FC),
+                            focusedLabelColor = Color(0xFFC084FC),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    OutlinedTextField(
+                        value = aiProjectNameInput,
+                        onValueChange = { aiProjectNameInput = it },
+                        label = { Text("Nombre del Proyecto") },
+                        placeholder = { Text("Ej: GastosDiariosApp") },
+                        singleLine = true,
+                        colors = OutlinedTextFieldDefaults.colors(
+                            focusedBorderColor = Color(0xFF7B61FF),
+                            focusedLabelColor = Color(0xFF7B61FF),
+                            focusedTextColor = Color.White,
+                            unfocusedTextColor = Color.White
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        val name = aiProjectNameInput.ifBlank { "MiApp" }
+                        val goal = aiProjectGoalInput.ifBlank { "Crear una nueva aplicación" }
+                        onNewProjectFromScratch?.invoke(name, goal)
+                        showAiCreatorDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF7B61FF))
+                ) {
+                    Text("✨ Crear y Comenzar", color = Color.White, fontWeight = FontWeight.Bold)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAiCreatorDialog = false }) {
                     Text("Cancelar", color = Color(0xFF94A3B8))
                 }
             }
@@ -593,6 +691,7 @@ private fun ProjectItemCard(
  */
 @Composable
 private fun ActionsGridPanel(
+    onOpenAiCreatorDialog: () -> Unit,
     onNewProjectFromTemplate: () -> Unit,
     onOpenImportDialog: () -> Unit,
     onOpenCloneDialog: () -> Unit,
@@ -608,7 +707,7 @@ private fun ActionsGridPanel(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(14.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
@@ -627,12 +726,20 @@ private fun ActionsGridPanel(
             }
 
             Text(
-                text = "Crea un proyecto modular, importa una carpeta existente o clona un repositorio Git remoto.",
+                text = "Crea tu proyecto con el asistente senior, usa plantillas o importa una carpeta.",
                 color = Color(0xFF94A3B8),
                 fontSize = 11.sp
             )
 
-            Spacer(modifier = Modifier.height(4.dp))
+            // Acción 0: Asistente Senior para Crear Proyecto Paso a Paso
+            ActionCardButton(
+                title = "✨ Asistente IA: Crear Proyecto Paso a Paso",
+                description = "🧙‍♂️ Cuéntale tu idea al asistente senior. Elegiremos el nombre y crearemos tu espacio de trabajo listo para programar.",
+                icon = Icons.Default.AutoAwesome,
+                accentColor = Color(0xFFC084FC),
+                onClick = onOpenAiCreatorDialog,
+                modifier = Modifier.weight(1f)
+            )
 
             // Acción 1: Nuevo Proyecto desde Plantilla
             ActionCardButton(

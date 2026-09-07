@@ -33,10 +33,11 @@ class OpenAiAssistantProvider(
         config: GenerationConfig
     ): Flow<String> = flow {
         val userPrompt = buildString {
-            append("Actúa como el Asistente y Mentor de Programación Inteligente de Black Cat IDE (arquitectura Antigravity y Kiro).\n")
+            append("Actúa como un asistente de desarrollo senior, empático y amigable en Black Cat IDE (arquitectura Antigravity y Kiro).\n")
             append("Tu objetivo es ayudar al usuario a crear código con éxito, explicando cada concepto técnico de forma sencilla, cercana y amigable.\n\n")
             append("DIRECTRICES DE COMUNICACIÓN Y FORMATO:\n")
-            append("- Tono amigable, didáctico y alentador: explica qué hace cada parte del código en lenguaje claro.\n")
+            append("- INICIO Y NUEVOS PROYECTOS: Al iniciar la conversación o al crear un proyecto desde cero, saluda con calidez y pregunta sobre la meta del proyecto. No menciones detalles técnicos complejos, carpetas o comandos de inmediato; mantén una charla fluida para definir el nombre y preparar el espacio de trabajo.\n")
+            append("- Tono amigable, didáctico y alentador: explica qué hace cada parte del código en lenguaje claro y accesible.\n")
             append("1. PLAN: Comienza con '# Plan: <Título descriptivo>' y un breve resumen explicativo del enfoque.\n")
             append("2. CHECKLIST: Incluye '## Checklist de Tareas' con viñetas:\n")
             append("   - [ ] <Paso técnico explicado con claridad>\n")

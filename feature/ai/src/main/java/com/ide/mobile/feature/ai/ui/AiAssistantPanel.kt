@@ -352,34 +352,35 @@ fun AiAssistantPanel(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = activeAgent?.name ?: "Black Cat Antigravity Copilot",
+                        text = activeAgent?.name ?: "Black Cat Senior Copilot",
                         color = Color.White,
                         fontSize = 16.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Spacer(modifier = Modifier.height(4.dp))
                     Text(
-                        text = activeAgent?.description ?: "Listo para crear carpetas, instalar paquetes y compilar.",
+                        text = "¡Hola! Qué gusto saludarte. Te acompaño paso a paso a crear tu app de forma amigable y sin complicaciones.",
                         color = Color(0xFF94A3B8),
                         fontSize = 12.sp,
                         lineHeight = 16.sp
                     )
 
-                    Spacer(modifier = Modifier.height(16.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Text(
-                        text = "✨ ¿Qué deseas crear hoy?",
+                        text = "✨ ¿Qué te gustaría construir hoy?",
                         color = Color(0xFFC084FC),
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Toca una opción o escribe abajo con tus propias palabras:",
+                        text = "Toca una opción para comenzar a charlar o escribe abajo tu idea:",
                         color = Color(0xFF94A3B8),
                         fontSize = 11.sp,
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
 
                     val starterCards = listOf(
+                        Triple("🚀", "Crear un Proyecto desde Cero", "¡Hola! Quiero crear un nuevo proyecto desde cero. Ayúdame a definir el objetivo y el nombre de mi app."),
                         Triple("📱", "Crear una App de Tareas", "Crea una app completa de lista de tareas con opciones para agregar, marcar y eliminar tareas"),
                         Triple("🎨", "Diseñar Pantalla de Login", "Diseña una pantalla de inicio de sesión moderna con correo, contraseña y botón animado"),
                         Triple("🧮", "Crear una Calculadora Táctil", "Crea el código de una calculadora funcional con diseño limpio y botones interactivos"),

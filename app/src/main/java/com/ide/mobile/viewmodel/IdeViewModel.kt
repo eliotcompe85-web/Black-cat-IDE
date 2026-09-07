@@ -1377,6 +1377,49 @@ class IdeViewModel : ViewModel() {
         }
     }
 
+    /**
+     * Crea un proyecto desde cero de forma amigable y guiada por el Asistente Senior de IA.
+     */
+    fun createProjectFromScratch(
+        name: String,
+        goal: String = "",
+        type: ProjectTemplateType = ProjectTemplateType.FLUTTER_MOBILE
+    ) {
+        val safeName = name.trim().replace(" ", "_").ifBlank { "MiProyecto" }
+        val displayTitle = name.trim().ifBlank { "Mi Proyecto" }
+        val projectGoal = goal.trim().ifBlank { "Crear una nueva aplicación móvil" }
+
+        val newProject = ProjectTemplate.createNewCustomProject(safeName, projectGoal, type)
+        val newInitialFile = findInitialFile(newProject)
+        val newTabs = findInitialTabs(newProject)
+        undoStack.clear()
+        redoStack.clear()
+
+        _uiState.update {
+            it.copy(
+                rootProject = newProject,
+                activeFile = newInitialFile,
+                openTabs = newTabs,
+                editorValue = TextFieldValue(text = newInitialFile.content, selection = TextRange(0)),
+                isFileModified = false,
+                canUndo = false,
+                canRedo = false,
+                showProjectLauncher = false,
+                showCommandPalette = false,
+                currentNavTab = MainNavTab.AI_ASSISTANT,
+                consoleLogs = it.consoleLogs + listOf(
+                    "[Asistente] ✨ ¡Bienvenido a tu nuevo proyecto '$displayTitle'!",
+                    "[Asistente] Objetivo: $projectGoal",
+                    "[Asistente] Espacio de trabajo inicializado en: ${newProject.path}"
+                )
+            )
+        }
+
+        // Enviar automáticamente el saludo de bienvenida con el objetivo al asistente para iniciar la charla fluida
+        val prompt = "¡Hola! He creado mi proyecto '$displayTitle' con el objetivo de '$projectGoal'. ¿Cómo empezamos a construirlo paso a paso?"
+        askAiAssistant(prompt)
+    }
+
     fun runSmartRunner() {
         val active = _uiState.value.activeFile
         if (active.name.endsWith(".html") || active.name.endsWith(".htm") || active.name.endsWith(".md")) {

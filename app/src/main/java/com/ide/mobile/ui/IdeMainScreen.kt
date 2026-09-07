@@ -680,6 +680,14 @@ fun IdeMainScreen(
                 onExecute = { viewModel.toggleLivePreview() }
             ),
             CommandPaletteAction(
+                id = "create_ai_project",
+                title = "✨ Crear Proyecto con Asistente IA...",
+                subtitle = "Guía conversacional senior para definir nombre y meta",
+                icon = Icons.Default.AutoAwesome,
+                tint = Color(0xFFC084FC),
+                onExecute = { viewModel.toggleProjectLauncher(true) }
+            ),
+            CommandPaletteAction(
                 id = "create_template",
                 title = "📦 Nuevo Proyecto desde Plantilla...",
                 subtitle = "Flutter, Expo React Native, Railway o Python",
@@ -719,6 +727,10 @@ fun IdeMainScreen(
                 onOpenProject = { proj ->
                     viewModel.openWorkspaceProject(proj)
                     coroutineScope.launch { snackbarHostState.showSnackbar("Espacio de trabajo: ${proj.name}") }
+                },
+                onNewProjectFromScratch = { name, goal ->
+                    viewModel.createProjectFromScratch(name, goal)
+                    coroutineScope.launch { snackbarHostState.showSnackbar("✨ ¡Bienvenido a $name!") }
                 },
                 onNewProjectFromTemplate = {
                     viewModel.toggleProjectLauncher(false)

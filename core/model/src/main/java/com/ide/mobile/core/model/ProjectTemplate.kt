@@ -58,6 +58,152 @@ data class ProjectTemplate(
             }
         }
 
+        fun createNewCustomProject(
+            projectName: String,
+            projectGoal: String = "",
+            templateType: ProjectTemplateType = ProjectTemplateType.FLUTTER_MOBILE
+        ): ProjectFile {
+            val safeName = projectName.trim().replace(" ", "_").ifBlank { "mi_proyecto" }
+            val cleanTitle = projectName.trim().ifBlank { "Mi Proyecto" }
+            val goalText = projectGoal.ifBlank { "Construir una gran aplicación con Black Cat IDE" }
+
+            val root = ProjectFile(
+                id = "proj_${'$'}safeName",
+                name = safeName,
+                path = "/$safeName",
+                isDirectory = true
+            )
+
+            val readme = ProjectFile(
+                id = "file_readme_${'$'}safeName",
+                name = "README.md",
+                path = "/$safeName/README.md",
+                isDirectory = false,
+                content = """
+                # 🚀 $cleanTitle
+                
+                > **Objetivo del proyecto:** $goalText
+                
+                ---
+                
+                ### ✨ Espacio de Trabajo Creado con Éxito
+                Este proyecto ha sido configurado especialmente para ti con una estructura limpia y moderna.
+                
+                ### 🧙‍♂️ Tu Asistente de Desarrollo Senior
+                Tu asistente IA está activo en la pestaña **IA Copilot**. Puedes preguntarle:
+                - *"¿Cómo agregamos la primera pantalla?"*
+                - *"Diseñemos los botones e interactividad"*
+                - *"Explícame cómo funciona este código"*
+                
+                ¡Mucho éxito con tu nueva app!
+                """.trimIndent()
+            )
+
+            val lib = ProjectFile(
+                id = "dir_lib_${'$'}safeName",
+                name = "lib",
+                path = "/$safeName/lib",
+                isDirectory = true
+            )
+
+            val mainDart = ProjectFile(
+                id = "file_main_${'$'}safeName",
+                name = "main.dart",
+                path = "/$safeName/lib/main.dart",
+                isDirectory = false,
+                content = """
+import 'package:flutter/material.dart';
+
+void main() {
+  runApp(const MyApp());
+}
+
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: '$cleanTitle',
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF7B61FF),
+          brightness: Brightness.dark,
+        ),
+        useMaterial3: true,
+      ),
+      home: const WelcomeScreen(),
+    );
+  }
+}
+
+class WelcomeScreen extends StatelessWidget {
+  const WelcomeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0C0D15),
+      appBar: AppBar(
+        title: const Text('$cleanTitle', style: TextStyle(fontWeight: FontWeight.bold)),
+        backgroundColor: const Color(0xFF141522),
+        elevation: 0,
+        centerTitle: true,
+      ),
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: const BoxDecoration(
+                  color: Color(0x267B61FF),
+                  shape: BoxShape.circle,
+                ),
+                child: const Icon(Icons.rocket_launch, size: 64, color: Color(0xFFC084FC)),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                '¡Bienvenido a $cleanTitle!',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 12),
+              Text(
+                '$goalText',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF94A3B8)),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {},
+                icon: const Icon(Icons.star),
+                label: const Text('¡Comenzar!'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF7B61FF),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+""".trimIndent()
+            )
+
+            lib.children.add(mainDart)
+            root.children.add(readme)
+            root.children.add(lib)
+            return root
+        }
+
         private fun createFlutterProject(): ProjectFile {
             val root = ProjectFile(
                 id = "proj_flutter",

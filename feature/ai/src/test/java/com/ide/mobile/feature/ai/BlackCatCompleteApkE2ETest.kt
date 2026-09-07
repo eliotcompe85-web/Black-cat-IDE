@@ -250,4 +250,28 @@ class BlackCatCompleteApkE2ETest {
             assertNotNull(purpose)
         }
     }
+
+    @Test
+    fun testEndToEnd_SeniorFriendlyProjectCreationAndOnboarding() {
+        val dummyContext = CodeContext(fullText = "", cursorOffset = 0, currentLine = 1, filePath = "lib/main.dart")
+
+        // 1. Saludo inicial sin detalles técnicos
+        val greetingResponse = SmartAgentSynthesizer.synthesizeResponse("¡Hola! Quiero empezar un nuevo proyecto", dummyContext)
+        assertTrue(greetingResponse.contains("asistente senior") || greetingResponse.contains("asistente de desarrollo"))
+        assertTrue(greetingResponse.contains("meta principal") || greetingResponse.contains("te gustaría construir"))
+
+        // 2. Definición del objetivo de proyecto -> Generación amigable y bautizo de la app
+        val projectIdeaResponse = SmartAgentSynthesizer.synthesizeResponse("Quiero crear una app para registrar mis recetas de cocina casera", dummyContext)
+        assertTrue(projectIdeaResponse.contains("# Plan: Creando tu Nuevo Proyecto"))
+        assertTrue(projectIdeaResponse.contains("RecetasDeliciosas"))
+        assertTrue(projectIdeaResponse.contains("## Checklist de Pasos Iniciales"))
+        assertTrue(projectIdeaResponse.contains("// File: lib/main.dart"))
+
+        // 3. Creación programática del espacio de trabajo personalizado
+        val customProject = com.ide.mobile.core.model.ProjectTemplate.createNewCustomProject("MiAppDeRecetas", "Guardar recetas caseras")
+        assertEquals("MiAppDeRecetas", customProject.name)
+        val files = customProject.flatten()
+        assertTrue(files.any { it.name == "README.md" && it.content.contains("Guardar recetas caseras") })
+        assertTrue(files.any { it.name == "main.dart" && it.content.contains("MiAppDeRecetas") })
+    }
 }

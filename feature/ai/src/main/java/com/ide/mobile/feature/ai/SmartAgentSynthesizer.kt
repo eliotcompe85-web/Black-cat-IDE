@@ -15,6 +15,15 @@ object SmartAgentSynthesizer {
         val isKotlinOrCompose = context.filePath.endsWith(".kt") || pLower.contains("compose") || pLower.contains("kotlin") || pLower.contains("android")
 
         return when {
+            // 0. Inicio / Crear Proyecto desde Cero / Saludo de Bienvenida Senior
+            pLower.contains("desde cero") || pLower.contains("crear proyecto") || pLower.contains("nuevo proyecto") ||
+            pLower.contains("iniciar proyecto") || pLower.contains("empezar proyecto") || pLower.contains("espacio de trabajo") ||
+            pLower.contains("crear una app") || pLower.contains("crear app") || pLower.contains("nueva app") ||
+            pLower.contains("receta") || pLower.contains("bautizar") || pLower == "hola" || pLower.startsWith("hola ") || pLower == "buenas" ||
+            (pLower.contains("objetivo") && (pLower.contains("proyecto") || pLower.contains("meta") || pLower.contains("app"))) -> {
+                generateProjectCreationGreetingResponse(p, isKotlinOrCompose)
+            }
+
             // 1. Tareas / To-Do App
             pLower.contains("tarea") || pLower.contains("todo") || pLower.contains("to-do") || pLower.contains("pendientes") -> {
                 generateTodoAppResponse(isKotlinOrCompose)
@@ -65,6 +74,138 @@ object SmartAgentSynthesizer {
                 generateGenericHelpfulResponse(p, context, isKotlinOrCompose)
             }
         }
+    }
+
+    private fun generateProjectCreationGreetingResponse(prompt: String, isKotlin: Boolean): String {
+        val pLower = prompt.lowercase()
+        val hasSpecificDomain = pLower.contains("receta") || pLower.contains("gasto") || pLower.contains("tienda") ||
+                pLower.contains("juego") || pLower.contains("musica") || pLower.contains("chat") || pLower.contains("comida") ||
+                pLower.contains("cocina") || pLower.contains("diario") || pLower.contains("trivia") || pLower.contains("fitness") ||
+                pLower.contains("pedido") || pLower.contains("restaurante") || pLower.contains("café") || pLower.contains("cafe") ||
+                (pLower.contains("objetivo") && (pLower.contains("es ") || pLower.contains("de '") || pLower.contains("de \"")))
+
+        if (!hasSpecificDomain) {
+            return """
+            ¡Hola! Qué gusto saludarte. Te doy una cálida bienvenida a tu entorno de desarrollo.
+            
+            Soy tu asistente senior de desarrollo y estoy aquí para acompañarte paso a paso a convertir cualquier idea que tengas en una aplicación real, funcional y bien diseñada, de forma fácil y sin complicaciones.
+            
+            Para empezar con el pie derecho, cuéntame: **¿qué te gustaría construir hoy o cuál es la meta principal de tu proyecto?**
+            
+            Cuéntame un poco de qué va tu idea y, a partir de eso, pensamos juntos en un buen nombre para bautizar el proyecto y dejar listo tu nuevo espacio de trabajo. ¡Tú tienes la visión y yo me encargo de ayudarte a hacerla realidad!
+            """.trimIndent()
+        }
+
+        val ideaSnippet = prompt.substringAfter("objetivo de", "").ifBlank {
+            prompt.substringAfter("objetivo:", "").ifBlank {
+                prompt.substringAfter("para", "").ifBlank {
+                    prompt.substringAfter("de", "tu aplicación").trim()
+                }
+            }
+        }.trim().removeSurrounding("'", "'").removeSurrounding("\"", "\"").take(40)
+
+        val suggestedName = when {
+            pLower.contains("gasto") || pLower.contains("dinero") || pLower.contains("finanza") -> "FinanzasPro"
+            pLower.contains("receta") || pLower.contains("comida") || pLower.contains("cocina") -> "RecetasDeliciosas"
+            pLower.contains("nota") || pLower.contains("diario") || pLower.contains("apunte") -> "NotasExpress"
+            pLower.contains("tienda") || pLower.contains("pedido") || pLower.contains("compra") -> "MiTiendaFacil"
+            pLower.contains("juego") || pLower.contains("trivia") || pLower.contains("quiz") -> "SuperTrivia"
+            else -> "MiSuperApp"
+        }
+
+        return """
+        # Plan: Creando tu Nuevo Proyecto - $suggestedName
+        ¡Hola! Como tu asistente senior de desarrollo, te digo que es una maravillosa idea. Un proyecto enfocado en "$ideaSnippet" tiene muchísimo potencial, es útil y muy entretenido de construir.
+        
+        Te propongo bautizar este proyecto como **$suggestedName**. He preparado la estructura inicial limpia y una pantalla de bienvenida interactiva para que tu espacio de trabajo quede listo para programar de inmediato.
+        
+        ## Checklist de Pasos Iniciales
+        - [x] Definir el objetivo del proyecto: $ideaSnippet
+        - [x] Estructurar el espacio de trabajo con buenas prácticas
+        - [x] Diseñar pantalla de bienvenida moderna y amigable
+        - [ ] [HUMANO] Tocar 'Guardar y Escribir' para inicializar tu proyecto en el editor
+        
+        ```dart
+        // File: lib/main.dart
+        import 'package:flutter/material.dart';
+        
+        void main() {
+          runApp(const $suggestedName());
+        }
+        
+        class $suggestedName extends StatelessWidget {
+          const $suggestedName({super.key});
+        
+          @override
+          Widget build(BuildContext context) {
+            return MaterialApp(
+              title: '$suggestedName',
+              debugShowCheckedModeBanner: false,
+              theme: ThemeData(
+                colorScheme: ColorScheme.fromSeed(
+                  seedColor: const Color(0xFF7B61FF),
+                  brightness: Brightness.dark,
+                ),
+                useMaterial3: true,
+              ),
+              home: const HomeScreen(),
+            );
+          }
+        }
+        
+        class HomeScreen extends StatelessWidget {
+          const HomeScreen({super.key});
+        
+          @override
+          Widget build(BuildContext context) {
+            return Scaffold(
+              backgroundColor: const Color(0xFF0C0D15),
+              appBar: AppBar(
+                title: const Text('$suggestedName', style: TextStyle(fontWeight: FontWeight.bold)),
+                backgroundColor: const Color(0xFF141522),
+                centerTitle: true,
+              ),
+              body: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(24.0),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.rocket_launch, size: 72, color: Color(0xFFC084FC)),
+                      const SizedBox(height: 20),
+                      const Text(
+                        '¡Tu Espacio de Trabajo está Listo!',
+                        style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 12),
+                      const Text(
+                        '$ideaSnippet',
+                        style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 32),
+                      ElevatedButton.icon(
+                        onPressed: () {},
+                        icon: const Icon(Icons.add),
+                        label: const Text('Comenzar Primer Módulo'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF7B61FF),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            );
+          }
+        }
+        ```
+        
+        💡 *Toca **"✨ Guardar y Escribir en lib/main.dart"** para ver tu proyecto en el editor y continuar conversando.*
+        """.trimIndent()
     }
 
     private fun generateTodoAppResponse(isKotlin: Boolean): String {
