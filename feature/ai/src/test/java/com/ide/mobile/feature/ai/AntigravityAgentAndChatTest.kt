@@ -128,9 +128,77 @@ class AntigravityAgentAndChatTest {
         assertTrue(contents[0] is ChatContent.Text)
         assertTrue(contents[1] is ChatContent.ActionCard)
 
-        val card = contents[1] as ChatContent.ActionCard
-        assertEquals("Verificar estado de Git", card.action.title)
-        assertEquals("git status --short", card.action.payload)
-        assertEquals(ActionStatus.PROPOSED, card.action.status)
+        val actionCard = contents[1] as ChatContent.ActionCard
+        assertEquals(AgentActionType.RUN_COMMAND, actionCard.action.type)
+        assertEquals("git status --short", actionCard.action.payload)
+    }
+
+    @Test
+    fun testMissionControlAgentStates() {
+        val idleAgent = ActiveAgentContext(
+            agentId = "local-1",
+            agentName = "Python Fixer",
+            isLocal = true,
+            currentState = AgentState.Idle
+        )
+        assertEquals(AgentState.Idle, idleAgent.currentState)
+
+        val executingAgent = idleAgent.copy(
+            currentState = AgentState.Executing(
+                taskDescription = "Analizando dependencias",
+                progress = 0.65f
+            )
+        )
+        assertTrue(executingAgent.currentState is AgentState.Executing)
+        assertEquals(0.65f, (executingAgent.currentState as AgentState.Executing).progress, 0.001f)
+
+        val waitingAgent = executingAgent.copy(
+            currentState = AgentState.WaitingForUser(
+                actionRequired = "Ingrese API Key para Claude",
+                canResume = true
+            )
+        )
+        assertTrue(waitingAgent.currentState is AgentState.WaitingForUser)
+        val waitingState = waitingAgent.currentState as AgentState.WaitingForUser
+        assertTrue(waitingState.canResume)
+        assertEquals("Ingrese API Key para Claude", waitingState.actionRequired)
+    }
+
+    @Test
+    fun testArtifactChatContents() {
+        val checklist = ChatContent.ActionChecklist(
+            title = "Plan de Refactorización",
+            tasks = listOf(
+                ChecklistTask(description = "Crear modelo de dominio", isCompleted = true, requiresHuman = false),
+                ChecklistTask(description = "Configurar clave en .env", isCompleted = false, requiresHuman = true)
+            )
+        )
+        assertEquals("Plan de Refactorización", checklist.title)
+        assertEquals(2, checklist.tasks.size)
+        assertTrue(checklist.tasks[0].isCompleted)
+        assertFalse(checklist.tasks[0].requiresHuman)
+        assertTrue(checklist.tasks[1].requiresHuman)
+
+        val codeBlockWithTarget = ChatContent.CodeBlock(
+            code = "fun hello() = println()",
+            language = "kotlin",
+            targetFilePath = "app/src/main/MainActivity.kt"
+        )
+        assertEquals("app/src/main/MainActivity.kt", codeBlockWithTarget.targetFilePath)
+
+        val planArtifact = ChatContent.PlanArtifact(
+            title = "Arquitectura de IA",
+            summary = "Estructurar agentes y checklists interactivos"
+        )
+        assertEquals("Arquitectura de IA", planArtifact.title)
+
+        val message = ChatMessage(
+            senderName = "Gemini Flash Copilot",
+            isFromUser = false,
+            contents = listOf(planArtifact, checklist, codeBlockWithTarget)
+        )
+        assertEquals(3, message.contents.size)
+        assertFalse(message.isFromUser)
+        assertEquals("Gemini Flash Copilot", message.senderName)
     }
 }

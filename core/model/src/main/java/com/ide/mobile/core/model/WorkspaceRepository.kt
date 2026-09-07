@@ -17,7 +17,10 @@ import kotlinx.coroutines.withContext
  */
 interface WorkspaceRepository {
     val workspaceState: StateFlow<WorkspaceState>
+    val recentProjects: kotlinx.coroutines.flow.Flow<List<ProjectEntity>>
 
+    suspend fun openOrCreateLocalProject(name: String, path: String)
+    suspend fun importProjectFromDirectory(directoryUri: android.net.Uri, projectName: String)
     suspend fun getRecentProjects(): List<Project>
     suspend fun saveProject(project: Project)
     suspend fun deleteProject(projectId: String)
@@ -81,11 +84,40 @@ class WorkspaceDatabaseHelper(context: Context) : SQLiteOpenHelper(
  * Implementación de repositorio respaldada por base de datos SQLite con patrón Room / DAO.
  */
 class RoomWorkspaceRepository(
-    private val dbHelper: WorkspaceDatabaseHelper? = null
+    private val dbHelper: WorkspaceDatabaseHelper? = null,
+    private val projectDao: ProjectDao? = null
 ) : WorkspaceRepository {
 
     private val _workspaceState = MutableStateFlow(WorkspaceState())
     override val workspaceState: StateFlow<WorkspaceState> = _workspaceState.asStateFlow()
+
+    override val recentProjects: kotlinx.coroutines.flow.Flow<List<ProjectEntity>> =
+        projectDao?.getAllProjects() ?: kotlinx.coroutines.flow.flowOf(emptyList())
+
+    override suspend fun openOrCreateLocalProject(name: String, path: String) {
+        val project = ProjectEntity(
+            id = java.util.UUID.randomUUID().toString(),
+            name = name,
+            rootPath = path,
+            lastOpenedTimestamp = System.currentTimeMillis(),
+            isRemote = false
+        )
+        projectDao?.insertProject(project)
+        saveProject(
+            Project(
+                id = project.id,
+                name = project.name,
+                path = project.rootPath,
+                lastOpenedTimestamp = project.lastOpenedTimestamp,
+                projectType = ProjectTemplateType.FLUTTER_MOBILE
+            )
+        )
+    }
+
+    override suspend fun importProjectFromDirectory(directoryUri: android.net.Uri, projectName: String) {
+        val path = directoryUri.toString()
+        openOrCreateLocalProject(projectName, path)
+    }
 
     // Memoria caché de respaldo si el helper es nulo (pruebas unitarias puras)
     private val inMemoryProjects = mutableMapOf<String, Project>()
@@ -270,5 +302,29 @@ class RoomWorkspaceRepository(
             val updated = existing.copy(isFavorite = !existing.isFavorite)
             saveProject(updated)
         }
+    }
+}
+
+/**
+ * Repositorio de Workspace directo respaldado por Room ProjectDao.
+ */
+class DirectWorkspaceRepository(private val projectDao: ProjectDao) {
+
+    val recentProjects: kotlinx.coroutines.flow.Flow<List<ProjectEntity>> = projectDao.getAllProjects()
+
+    suspend fun openOrCreateLocalProject(name: String, path: String) {
+        val project = ProjectEntity(
+            id = java.util.UUID.randomUUID().toString(),
+            name = name,
+            rootPath = path,
+            lastOpenedTimestamp = System.currentTimeMillis(),
+            isRemote = false
+        )
+        projectDao.insertProject(project)
+    }
+
+    suspend fun importProjectFromDirectory(directoryUri: android.net.Uri, projectName: String) {
+        val path = directoryUri.toString()
+        openOrCreateLocalProject(projectName, path)
     }
 }

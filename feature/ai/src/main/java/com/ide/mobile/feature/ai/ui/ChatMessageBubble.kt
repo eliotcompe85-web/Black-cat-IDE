@@ -154,13 +154,60 @@ fun ChatMessageBubble(
                                     )
                                 }
                             }
-                            is ChatContent.CodeBlock -> {
-                                CodeBlockCard(
-                                    code = content.code,
-                                    language = content.language,
-                                    onApplyCode = onApplyCode,
-                                    modifier = Modifier.padding(vertical = 4.dp)
+                            is ChatContent.Prose -> {
+                                if (content.text.isNotBlank()) {
+                                    Text(
+                                        text = content.text,
+                                        color = if (isUser) Color(0xFFF1F5F9) else Color(0xFFE2E8F0),
+                                        fontSize = 13.sp,
+                                        lineHeight = 20.sp,
+                                        modifier = Modifier.padding(vertical = 2.dp)
+                                    )
+                                }
+                            }
+                            is ChatContent.PlanArtifact -> {
+                                Card(
+                                    shape = RoundedCornerShape(10.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color(0xFF13172A)),
+                                    border = BorderStroke(1.dp, Color(0xFF2B3356)),
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                                ) {
+                                    Column(modifier = Modifier.padding(12.dp)) {
+                                        Text(
+                                            text = "📋 ${content.title}",
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = Color(0xFF38BDF8)
+                                        )
+                                        Spacer(modifier = Modifier.height(6.dp))
+                                        Text(
+                                            text = content.summary,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = Color(0xFFCBD5E1)
+                                        )
+                                    }
+                                }
+                            }
+                            is ChatContent.ActionChecklist -> {
+                                ActionChecklistCard(
+                                    content = content,
+                                    onHumanTaskToggled = { _, _ -> }
                                 )
+                            }
+                            is ChatContent.CodeBlock -> {
+                                if (content.targetFilePath != null) {
+                                    CodeBlockArtifactCard(
+                                        content = content,
+                                        onApplyToWorkspace = { code, _ -> onApplyCode?.invoke(code) }
+                                    )
+                                } else {
+                                    CodeBlockCard(
+                                        code = content.code,
+                                        language = content.language,
+                                        onApplyCode = onApplyCode,
+                                        modifier = Modifier.padding(vertical = 4.dp)
+                                    )
+                                }
                             }
                             is ChatContent.ActionCard -> {
                                 ActionCardItem(

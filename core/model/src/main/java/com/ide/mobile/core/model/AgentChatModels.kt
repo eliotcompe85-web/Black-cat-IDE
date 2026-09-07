@@ -49,11 +49,38 @@ data class AgentAction(
 )
 
 /**
- * Contenido estructurado de un mensaje en el chat del asistente IA.
+ * Elementos individuales de un Checklist interactivo en el chat del agente.
+ */
+data class ChecklistTask(
+    val id: String = UUID.randomUUID().toString(),
+    val description: String,
+    val isCompleted: Boolean,
+    val requiresHuman: Boolean // True si el agente está bloqueado esperando que el usuario lo haga
+)
+
+/**
+ * Contenido estructurado de un mensaje en el chat del asistente IA (Artefactos y Texto).
  */
 sealed interface ChatContent {
     data class Text(val text: String) : ChatContent
-    data class CodeBlock(val code: String, val language: String = "kotlin") : ChatContent
+    data class Prose(val text: String) : ChatContent // Texto normal renderizado en Markdown
+
+    data class PlanArtifact(
+        val title: String,
+        val summary: String
+    ) : ChatContent
+
+    data class ActionChecklist(
+        val title: String,
+        val tasks: List<ChecklistTask>
+    ) : ChatContent
+
+    data class CodeBlock(
+        val code: String,
+        val language: String = "kotlin",
+        val targetFilePath: String? = null // Si existe, permite inyectarlo directamente al espacio de trabajo
+    ) : ChatContent
+
     data class ActionCard(val action: AgentAction) : ChatContent
 }
 
@@ -62,14 +89,16 @@ sealed interface ChatContent {
  */
 data class ChatMessage(
     val id: String = UUID.randomUUID().toString(),
-    val sender: MessageSender,
+    val sender: MessageSender = MessageSender.USER,
     val text: String = "",
     val contents: List<ChatContent> = emptyList(),
     val timestamp: Long = System.currentTimeMillis(),
     val agentName: String? = null,
     val agentIcon: String? = null,
     val actions: List<AgentAction> = emptyList(),
-    val isStreaming: Boolean = false
+    val isStreaming: Boolean = false,
+    val senderName: String = agentName ?: if (sender == MessageSender.USER) "Usuario" else "Agente",
+    val isFromUser: Boolean = (sender == MessageSender.USER)
 ) {
     /**
      * Obtiene la lista de contenidos estructurados. Si [contents] está vacío pero [text]
@@ -122,3 +151,4 @@ data class DownloadableAgent(
     val downloadSize: String = "12 KB",
     val isDownloaded: Boolean = false
 )
+
